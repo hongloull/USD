@@ -5,14 +5,44 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/defaults
                       ${CMAKE_SOURCE_DIR}/cmake/modules
                       ${CMAKE_SOURCE_DIR}/cmake/macros)
 
+set(DEPS_ROOT /data/share/usd/dependency)
+
+set(PYTHON_ROOT /apps/shared/python/2.7.5)
+set(PYTHON_EXECUTABLE ${PYTHON_ROOT}/bin/python)
+set(PYTHON_LIBRARY ${PYTHON_ROOT}/lib/libpython2.7.so)
+set(PYTHON_INCLUDE_DIR ${PYTHON_ROOT}/include)
+
+set(BOOST_INCLUDE_DIR ${DEPS_ROOT}/boost_1_55_0/include)
+
+set(DOUBLE_CONVERSION_LIBRARY ${DEPS_ROOT}/double-conversion-1.1.5/lib/libdouble-conversion.so)
+set(DOUBLE_CONVERSION_INCLUDE_DIR ${DEPS_ROOT}/double-conversion-1.1.5/include)
+
+set(OPENEXR_ROOT_DIR ${DEPS_ROOT}/openexr-2.2.0)
+set(OPENEXR_INCLUDE_DIR ${OPENEXR_ROOT_DIR}/include)
+set(OPENEXR_LIBRARY_DIR ${OPENEXR_ROOT_DIR}/lib)
+set(OPENEXR_Half_LIBRARY ${DEPS_ROOT}/ilmbase-2.2.0/lib/libHalf.so)
+
+set(GLEW_LIBRARY ${DEPS_ROOT}/glew-1.10.0/lib64/libGLEW.so)
+set(GLEW_INCLUDE_DIR ${DEPS_ROOT}/glew-1.10.0/include)
+
+set(OPENSUBDIV_ROOT_DIR ${DEPS_ROOT}/OpenSubdiv-3_0_5)
+set(OPENSUBDIV_INCLUDE_DIR ${OPENSUBDIV_ROOT_DIR}/include)
+set(OPENSUBDIV_LIBRARIES ${OPENSUBDIV_ROOT_DIR}/lib)
+
+set(PTEX_LIBRARY ${DEPS_ROOT}/ptex-2.0.30/lib/libPtex.so)
+set(PTEX_INCLUDE_DIR ${DEPS_ROOT}/ptex-2.0.30/include)
+
+set(PYSIDEUIC4BINARY ${DEPS_ROOT}/pyside-1.2.2/bin/pyside-uic)
+set(PYSIDERCC4BINARY ${DEPS_ROOT}/pyside-1.2.2/bin/pyside-rcc)
+
 include(Options)
 include(ProjectDefaults)
 include(Packages)
 
 # This has to be defined after Packages is included, because it relies on the
 # discovered path to the python executable.
-set(PXR_PYTHON_SHEBANG "${PYTHON_EXECUTABLE}" 
-    CACHE 
+set(PXR_PYTHON_SHEBANG "${PYTHON_EXECUTABLE}"
+    CACHE
     STRING
     "Replacement path for Python #! line."
 )
@@ -38,7 +68,7 @@ function(_addIfExists pkg pkgCmakeLists)
 endfunction()
 
 function(_enableThirdPartyPlugin identifier)
-    set(pkg third_party/${identifier}) 
+    set(pkg third_party/${identifier})
     set(pkgCmakeLists ${CMAKE_CURRENT_SOURCE_DIR}/${pkg}/CMakeLists.txt)
     _addIfExists(${pkg} ${pkgCmakeLists})
 endfunction()

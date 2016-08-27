@@ -1,0 +1,8 @@
+# The target Python installation.
+py_platform = linux
+py_inc_dir = /apps/shared/python/2.7.5/include/python2.7
+py_pylib_dir = /apps/shared/python/2.7.5/lib/python2.7
+
+# Where SIP will be installed.
+sip_bin_dir = /apps/shared/python/2.7.5/bin
+sip_module_dir = /apps/shared/python/2.7.5/lib/python2.7/site-packages
