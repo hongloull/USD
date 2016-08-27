@@ -27,10 +27,6 @@ export OPENEXR_LIBRARY_DIR=$OPENEXR_ROOT_DIR/lib
 export LD_LIBRARY_PATH=/apps/shared/python/2.7.5/lib:$DEPS_ROOT/tbb-4.3.1:$DEPS_ROOT/openexr-2.2.0/lib:$DEPS_ROOT/qt-4.8.1/lib:$DEPS_ROOT/pyside-1.2.2/lib:$LD_LIBRARY_PATH
 export PYTHONPATH=$PYTHONPATH:$DEPS_ROOT/pyside-1.2.2/lib/python2.7/site-packages
 
-# add custom bison and flex path
-export BISON_EXECUTABLE=$DEPS_ROOT/bison-2.4.1/bin
-export FLEX_EXECUTABLE=$DEPS_ROOT/flex-2.5.39/bin
-
 source $DEPS_ROOT/tbb-4.3.1/tbbvars.sh
 
 # https://github.com/PixarAnimationStudios/USD/issues/16

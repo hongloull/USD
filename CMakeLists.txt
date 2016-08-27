@@ -32,8 +32,12 @@ set(OPENSUBDIV_LIBRARIES ${OPENSUBDIV_ROOT_DIR}/lib)
 set(PTEX_LIBRARY ${DEPS_ROOT}/ptex-2.0.30/lib/libPtex.so)
 set(PTEX_INCLUDE_DIR ${DEPS_ROOT}/ptex-2.0.30/include)
 
-set(PYSIDEUIC4BINARY ${DEPS_ROOT}/pyside-1.2.2/bin/pyside-uic)
+#set(PYSIDEUIC4BINARY ${DEPS_ROOT}/pyside-1.2.2/bin/pyside-uic)
+set(PYSIDEUICBINARY ${DEPS_ROOT}/pyside-1.2.2/bin/pyside-uic)
 set(PYSIDERCC4BINARY ${DEPS_ROOT}/pyside-1.2.2/bin/pyside-rcc)
+
+set(BISON_EXECUTABLE ${DEPS_ROOT}/bison-2.4.1/bin/bison)
+set(FLEX_EXECUTABLE ${DEPS_ROOT}/flex-2.5.39/bin/flex)
 
 include(Options)
 include(ProjectDefaults)
