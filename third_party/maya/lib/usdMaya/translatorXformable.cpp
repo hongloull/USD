@@ -21,9 +21,11 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
+#include "pxr/pxr.h"
 #include "usdMaya/translatorXformable.h"
 
 #include "usdMaya/translatorPrim.h"
+#include "usdMaya/translatorUtil.h"
 
 #include "pxr/usd/usdGeom/xformable.h"
 #include "pxr/usd/usdGeom/xform.h"
@@ -42,6 +44,9 @@
 
 #include <boost/assign/list_of.hpp>
 #include <algorithm>
+
+PXR_NAMESPACE_OPEN_SCOPE
+
 
 static const std::vector<std::string> _MAYA_OPS = boost::assign::list_of
     ("translate")
@@ -70,55 +75,82 @@ static const std::vector<std::string> _COMMON_OPS = boost::assign::list_of
 static const std::vector<std::pair<int, int> > _COMMON_OPS_PIVOTPAIRS = boost::assign::list_of
     ( std::make_pair(1, 4) );
 
-// This function retrieve a value for a given xformop and given time sample. It
+// This function retrieves a value for a given xformOp and given time sample. It
 // knows how to deal with different type of ops and angle conversion
 static bool _getXformOpAsVec3d(
-        const UsdGeomXformOp &xformop, 
-        GfVec3d &value, 
+        const UsdGeomXformOp &xformOp,
+        GfVec3d &value,
         const UsdTimeCode &usdTime)
 {
-    bool retValue=false; int rotAxis=-1; double angleMult=1;
-    UsdGeomXformOp::Type opType = xformop.GetOpType();
-    value=GfVec3d(0); if (opType == UsdGeomXformOp::TypeScale) value=GfVec3d(1);
+    bool retValue = false;
+
+    const UsdGeomXformOp::Type opType = xformOp.GetOpType();
+
+    if (opType == UsdGeomXformOp::TypeScale) {
+        value = GfVec3d(1.0);
+    } else {
+        value = GfVec3d(0.0);
+    }
+
+    // Check whether the XformOp is a type of rotation.
+    int rotAxis = -1;
+    double angleMult = GfDegreesToRadians(1.0);
 
     switch(opType) {
-        case UsdGeomXformOp::TypeRotateX: rotAxis=0; angleMult = GfDegreesToRadians(1.0); break;
-        case UsdGeomXformOp::TypeRotateY: rotAxis=1; angleMult = GfDegreesToRadians(1.0); break;
-        case UsdGeomXformOp::TypeRotateZ: rotAxis=2; angleMult = GfDegreesToRadians(1.0); break;
+        case UsdGeomXformOp::TypeRotateX:
+            rotAxis = 0;
+            break;
+        case UsdGeomXformOp::TypeRotateY:
+            rotAxis = 1;
+            break;
+        case UsdGeomXformOp::TypeRotateZ:
+            rotAxis = 2;
+            break;
         case UsdGeomXformOp::TypeRotateXYZ:
         case UsdGeomXformOp::TypeRotateXZY:
         case UsdGeomXformOp::TypeRotateYXZ:
         case UsdGeomXformOp::TypeRotateYZX:
         case UsdGeomXformOp::TypeRotateZXY:
         case UsdGeomXformOp::TypeRotateZYX:
-        angleMult = GfDegreesToRadians(1.0);
-        break;
-        default: break;
+            break;
+        default:
+            // This XformOp is not a rotation, so we're not converting an
+            // angular value from degrees to radians.
+            angleMult = 1.0;
+            break;
     }
-    
-    // If we encounter a transform op we tread it as a shear operation
+
+    // If we encounter a transform op, we treat it as a shear operation.
     if (opType == UsdGeomXformOp::TypeTransform) {
-        GfMatrix4d xform(1.0);
-        retValue=xformop.Get(&xform, usdTime);
-        if (retValue) {
-            value[0]=xform[1][0]; //xyVal
-            value[1]=xform[2][0]; //xzVal
-            value[2]=xform[2][1]; //yzVal
-        }
-    } else if (rotAxis!=-1) {
+        // GetOpTransform() handles the inverse op case for us.
+        GfMatrix4d xform = xformOp.GetOpTransform(usdTime);
+        value[0] = xform[1][0]; //xyVal
+        value[1] = xform[2][0]; //xzVal
+        value[2] = xform[2][1]; //yzVal
+        retValue = true;
+    } else if (rotAxis != -1) {
         // Single Axis rotation
-        double valued=0;
-        retValue=xformop.GetAs<double>(&valued, usdTime);
-        if (retValue) value[rotAxis]=valued*angleMult;
+        double valued = 0;
+        retValue = xformOp.GetAs<double>(&valued, usdTime);
+        if (retValue) {
+            if (xformOp.IsInverseOp()) {
+                valued = -valued;
+            }
+            value[rotAxis] = valued * angleMult;
+        }
     } else {
         GfVec3d valued;
-        retValue=xformop.GetAs<GfVec3d>(&valued, usdTime);
+        retValue = xformOp.GetAs<GfVec3d>(&valued, usdTime);
         if (retValue) {
-            value[0]=valued[0]*angleMult;
-            value[1]=valued[1]*angleMult;
-            value[2]=valued[2]*angleMult;
+            if (xformOp.IsInverseOp()) {
+                valued = -valued;
+            }
+            value[0] = valued[0] * angleMult;
+            value[1] = valued[1] * angleMult;
+            value[2] = valued[2] * angleMult;
         }
     }
+
     return retValue;
 }
 
@@ -129,7 +161,7 @@ static void _setAnimPlugData(MPlug plg, std::vector<double> &value, MTimeArray &
     MStatus status;
     MFnAnimCurve animFn;
     // Make the plug keyable before attaching an anim curve
-    if (not plg.isKeyable()) {
+    if (!plg.isKeyable()) {
         plg.setKeyable(true);
     }
     MObject animObj = animFn.create(plg, NULL, &status);
@@ -330,7 +362,7 @@ static bool _pushUSDXformOpToMayaXform(
         const std::string& opName, 
         MFnDagNode &MdagNode,
         bool *importedPivots,
-        bool readAnimData,
+        const PxrUsdMayaPrimReaderArgs& args,
         const PxrUsdMayaPrimReaderContext* context)
 {
     std::vector<double> xValue;
@@ -338,11 +370,11 @@ static bool _pushUSDXformOpToMayaXform(
     std::vector<double> zValue;
     GfVec3d value;
     std::vector<double> timeSamples;
-    if (readAnimData) {
-        xformop.GetTimeSamples(&timeSamples);
+    if (args.GetReadAnimData()) {
+        PxrUsdMayaTranslatorUtil::GetTimeSamples(xformop, args, &timeSamples);
     }
     MTimeArray timeArray;
-    if (not timeSamples.empty()) {
+    if (!timeSamples.empty()) {
         timeArray.setLength(timeSamples.size());
         xValue.resize(timeSamples.size());
         yValue.resize(timeSamples.size());
@@ -402,7 +434,7 @@ static bool _isIdentityMatrix(GfMatrix4d m)
     bool isIdentity=true;
     for (unsigned int i=0; i<4; i++) {
         for (unsigned int j=0; j<4; j++) {
-            if ((i==j && GfIsClose(m[i][j], 1.0, 1e-9)==false) or
+            if ((i==j && GfIsClose(m[i][j], 1.0, 1e-9)==false) ||
                 (i!=j && GfIsClose(m[i][j], 0.0, 1e-9)==false)) {
                 isIdentity=false; break;
             }
@@ -415,6 +447,7 @@ static bool _isIdentityMatrix(GfMatrix4d m)
 static bool _pushUSDXformToMayaXform(
         const UsdGeomXformable &xformSchema, 
         MFnDagNode &MdagNode,
+        const PxrUsdMayaPrimReaderArgs& args,
         const PxrUsdMayaPrimReaderContext* context)
 {
     std::vector<double> TxVal, TyVal, TzVal;
@@ -425,9 +458,9 @@ static bool _pushUSDXformToMayaXform(
     GfMatrix4d localXform(1.0);
 
     std::vector<double> tSamples;
-    xformSchema.GetTimeSamples(&tSamples);
+    PxrUsdMayaTranslatorUtil::GetTimeSamples(xformSchema, args, &tSamples);
     MTimeArray timeArray;
-    if (not tSamples.empty()) {
+    if (!tSamples.empty()) {
         timeArray.setLength(tSamples.size());
         TxVal.resize(tSamples.size()); TyVal.resize(tSamples.size()); TzVal.resize(tSamples.size());
         RxVal.resize(tSamples.size()); RyVal.resize(tSamples.size()); RzVal.resize(tSamples.size());
@@ -438,7 +471,7 @@ static bool _pushUSDXformToMayaXform(
                                                    &resetsXformStack,
                                                    time)) {
                 xlate=GfVec3d(0); rotate=GfVec3d(0); scale=GfVec3d(1);
-                if (not _isIdentityMatrix(localXform)) {
+                if (!_isIdentityMatrix(localXform)) {
                      MGlobal::displayWarning("Decomposing non identity 4X4 matrix at: " 
                     + MString(xformSchema.GetPath().GetText()) + " At sample: " + tSamples[ti]);
                      PxrUsdMayaTranslatorXformable::ConvertUsdMatrixToComponents(
@@ -457,7 +490,7 @@ static bool _pushUSDXformToMayaXform(
     else {
         if (xformSchema.GetLocalTransformation(&localXform, &resetsXformStack)) {
             xlate=GfVec3d(0); rotate=GfVec3d(0); scale=GfVec3d(1);
-            if (not _isIdentityMatrix(localXform)) {
+            if (!_isIdentityMatrix(localXform)) {
                 MGlobal::displayWarning("Decomposing non identity 4X4 matrix at: " 
                     + MString(xformSchema.GetPath().GetText()));
                 PxrUsdMayaTranslatorXformable::ConvertUsdMatrixToComponents(
@@ -535,7 +568,7 @@ PxrUsdMayaTranslatorXformable::Read(
 
     bool importedPivots = false;
     MFnDagNode MdagNode(mayaNode);
-    if (not opNames.empty()) {
+    if (!opNames.empty()) {
         // make sure opNames.size() == xformops.size()
         for (unsigned int i=0; i < opNames.size(); i++) {
             const UsdGeomXformOp& xformop(xformops[i]);
@@ -550,11 +583,12 @@ PxrUsdMayaTranslatorXformable::Read(
                 }
             }
             _pushUSDXformOpToMayaXform(xformop, opName, MdagNode, &importedPivots,
-                    args.GetReadAnimData(), context);
+                    args, context);
         }
     } else {
         // This xform can't be safely interpreted by Maya. Decompose Matrix
-        if (_pushUSDXformToMayaXform(xformSchema, MdagNode, context)==false) {
+        if (_pushUSDXformToMayaXform(xformSchema, MdagNode, args, context) == 
+                false) {
             MGlobal::displayError(
                     "Unable to successfully decompose matrix at USD Prim:" 
                     + MString(xformSchema.GetPath().GetText()));
@@ -565,13 +599,13 @@ PxrUsdMayaTranslatorXformable::Read(
     // XXX:bug 117525
     // We support UsdGeomXformable.pivotPosition until we have robust
     // interchange with pivots encoded as xformOps.
-    if (not importedPivots) {
+    if (!importedPivots) {
         GfVec3f pivotPosition(0.);
         static const GfVec3f origin(0.);
         static const TfToken pivotPosTok("pivotPosition");
         if (xformSchema.GetPrim().GetAttribute(pivotPosTok).Get(
                 &pivotPosition, UsdTimeCode::Default())
-            and not GfIsClose(pivotPosition, origin, 1e-6)) {
+            && !GfIsClose(pivotPosition, origin, 1e-6)) {
             MTimeArray timeArray;
             std::vector<double> xValue(1, pivotPosition[0]);
             std::vector<double> yValue(1, pivotPosition[1]);
@@ -591,4 +625,7 @@ PxrUsdMayaTranslatorXformable::Read(
     }
 }
 
+
+
+PXR_NAMESPACE_CLOSE_SCOPE
 

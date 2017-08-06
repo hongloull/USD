@@ -38,6 +38,9 @@
 
 #include "pxr/base/tf/type.h"
 
+PXR_NAMESPACE_OPEN_SCOPE
+
+
 TF_REGISTRY_FUNCTION(TfType)
 {
     typedef UsdImagingMeshAdapter Adapter;
@@ -47,6 +50,12 @@ TF_REGISTRY_FUNCTION(TfType)
 
 UsdImagingMeshAdapter::~UsdImagingMeshAdapter()
 {
+}
+
+bool
+UsdImagingMeshAdapter::IsSupported(HdRenderIndex *renderIndex)
+{
+    return renderIndex->IsRprimTypeSupported(HdPrimTypeTokens->mesh);
 }
 
 SdfPath
@@ -65,7 +74,7 @@ UsdImagingMeshAdapter::Populate(UsdPrim const& prim,
 void
 UsdImagingMeshAdapter::TrackVariabilityPrep(UsdPrim const& prim,
                                             SdfPath const& cachePath,
-                                            int requestedBits,
+                                            HdDirtyBits requestedBits,
                                             UsdImagingInstancerContext const* 
                                                 instancerContext)
 {
@@ -77,8 +86,8 @@ UsdImagingMeshAdapter::TrackVariabilityPrep(UsdPrim const& prim,
 void
 UsdImagingMeshAdapter::TrackVariability(UsdPrim const& prim,
                                         SdfPath const& cachePath,
-                                        int requestedBits,
-                                        int* dirtyBits,
+                                        HdDirtyBits requestedBits,
+                                        HdDirtyBits* dirtyBits,
                                         UsdImagingInstancerContext const* 
                                             instancerContext)
 {
@@ -100,7 +109,7 @@ UsdImagingMeshAdapter::TrackVariability(UsdPrim const& prim,
 
     if (requestedBits & HdChangeTracker::DirtyTopology) {
         // Discover time-varying topology.
-        if (not _IsVarying(prim,
+        if (!_IsVarying(prim,
                            UsdGeomTokens->faceVertexCounts,
                            HdChangeTracker::DirtyTopology,
                            UsdImagingTokens->usdVaryingTopology,
@@ -108,7 +117,7 @@ UsdImagingMeshAdapter::TrackVariability(UsdPrim const& prim,
                            /*isInherited*/false)) {
             // Only do this check if the faceVertexCounts is not already known
             // to be varying.
-            if (not _IsVarying(prim,
+            if (!_IsVarying(prim,
                                UsdGeomTokens->faceVertexIndices,
                                HdChangeTracker::DirtyTopology,
                                UsdImagingTokens->usdVaryingTopology,
@@ -131,7 +140,7 @@ void
 UsdImagingMeshAdapter::UpdateForTimePrep(UsdPrim const& prim,
                                    SdfPath const& cachePath,
                                    UsdTimeCode time,
-                                   int requestedBits,
+                                   HdDirtyBits requestedBits,
                                    UsdImagingInstancerContext const* 
                                        instancerContext)
 {
@@ -139,22 +148,29 @@ UsdImagingMeshAdapter::UpdateForTimePrep(UsdPrim const& prim,
         prim, cachePath, time, requestedBits, instancerContext);
     UsdImagingValueCache* valueCache = _GetValueCache();
 
-    if (requestedBits & HdChangeTracker::DirtyPoints)
+    if (requestedBits & HdChangeTracker::DirtyPoints) {
         valueCache->GetPoints(cachePath);
+    }
 
-    if (requestedBits & HdChangeTracker::DirtySubdivTags)
-        valueCache->GetSubdivTags(cachePath);
-
-    if (requestedBits & HdChangeTracker::DirtyTopology)
+    if (requestedBits & HdChangeTracker::DirtyTopology) {
         valueCache->GetTopology(cachePath);
+    }
+
+    // Subdiv tags are only needed if the mesh is refined.  So
+    // there's no need to fetch the data if the prim isn't refined.
+    if (_delegate->IsRefined(cachePath)) {
+        if (requestedBits & HdChangeTracker::DirtySubdivTags) {
+            valueCache->GetSubdivTags(cachePath);
+        }
+    }
 }
 
 void
 UsdImagingMeshAdapter::UpdateForTime(UsdPrim const& prim,
                                SdfPath const& cachePath,
                                UsdTimeCode time,
-                               int requestedBits,
-                               int* resultBits,
+                               HdDirtyBits requestedBits,
+                               HdDirtyBits* resultBits,
                                UsdImagingInstancerContext const* 
                                    instancerContext)
 {
@@ -178,9 +194,13 @@ UsdImagingMeshAdapter::UpdateForTime(UsdPrim const& prim,
         _MergePrimvar(primvar, &primvars);
     }
 
-    if (requestedBits & HdChangeTracker::DirtySubdivTags) {
-        SubdivTags& tags = valueCache->GetSubdivTags(cachePath);
-        _GetSubdivTags(prim, &tags, time);
+    // Subdiv tags are only needed if the mesh is refined.  So
+    // there's no need to fetch the data if the prim isn't refined.
+    if (_delegate->IsRefined(cachePath)) {
+        if (requestedBits & HdChangeTracker::DirtySubdivTags) {
+            SubdivTags& tags = valueCache->GetSubdivTags(cachePath);
+            _GetSubdivTags(prim, &tags, time);
+        }
     }
 }
 
@@ -208,11 +228,9 @@ UsdImagingMeshAdapter::_GetMeshTopology(UsdPrim const& prim,
                                          UsdTimeCode time)
 {
     HD_TRACE_FUNCTION();
-    HD_MALLOC_TAG_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
     TfToken schemeToken;
     _GetPtr(prim, UsdGeomTokens->subdivisionScheme, time, &schemeToken);
-    if (schemeToken == UsdGeomTokens->none)
-        schemeToken = PxOsdOpenSubdivTokens->bilinear;
 
     *topo = HdMeshTopology(
         schemeToken,
@@ -228,8 +246,8 @@ UsdImagingMeshAdapter::_GetPoints(UsdPrim const& prim,
                                    UsdTimeCode time)
 {
     HD_TRACE_FUNCTION();
-    HD_MALLOC_TAG_FUNCTION();
-    if (not prim.GetAttribute(UsdGeomTokens->points).Get(value, time)) {
+    HF_MALLOC_TAG_FUNCTION();
+    if (!prim.GetAttribute(UsdGeomTokens->points).Get(value, time)) {
         *value = VtVec3fArray();
     }
 }
@@ -241,9 +259,9 @@ UsdImagingMeshAdapter::_GetSubdivTags(UsdPrim const& prim,
                                        UsdTimeCode time)
 {
     HD_TRACE_FUNCTION();
-    HD_MALLOC_TAG_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
 
-    if(not prim.IsA<UsdGeomMesh>())
+    if(!prim.IsA<UsdGeomMesh>())
         return;
 
     TfToken token; VtIntArray iarray; VtFloatArray farray;
@@ -260,9 +278,8 @@ UsdImagingMeshAdapter::_GetSubdivTags(UsdPrim const& prim,
     //_GetPtr(prim, UsdGeomTokens->creaseMethod, time, &token);
     //tags->SetCreaseMethod(token);
 
-    //_GetPtr(prim, UsdGeomTokens->trianglesSubdivision, time, &token);
-    //tags->SetTriangleSubdivision(token);
-
+    _GetPtr(prim, UsdGeomTokens->triangleSubdivisionRule, time, &token);
+    tags->SetTriangleSubdivision(token);
 
     _GetPtr(prim, UsdGeomTokens->creaseIndices, time, &iarray);
     tags->SetCreaseIndices(iarray);
@@ -282,4 +299,7 @@ UsdImagingMeshAdapter::_GetSubdivTags(UsdPrim const& prim,
     _GetPtr(prim, UsdGeomTokens->holeIndices, time, &iarray);
     tags->SetHoleIndices(iarray);
 }
+
+
+PXR_NAMESPACE_CLOSE_SCOPE
 

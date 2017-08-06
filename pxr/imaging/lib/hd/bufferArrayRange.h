@@ -24,6 +24,8 @@
 #ifndef HD_BUFFER_ARRAY_RANGE_H
 #define HD_BUFFER_ARRAY_RANGE_H
 
+#include "pxr/pxr.h"
+#include "pxr/imaging/hd/api.h"
 #include "pxr/imaging/hd/version.h"
 #include "pxr/base/tf/token.h"
 #include "pxr/base/vt/value.h"
@@ -32,9 +34,12 @@
 #include <boost/noncopyable.hpp>
 #include <boost/shared_ptr.hpp>
 
+PXR_NAMESPACE_OPEN_SCOPE
+
+
 class HdBufferArray;
 
-typedef std::vector<class HdBufferSpec> HdBufferSpecVector;
+typedef std::vector<struct HdBufferSpec> HdBufferSpecVector;
 typedef boost::shared_ptr<class HdBufferSource> HdBufferSourceSharedPtr;
 typedef boost::shared_ptr<class HdBufferArrayRange> HdBufferArrayRangeSharedPtr;
 
@@ -53,6 +58,7 @@ public:
     /// collection in its destructor. However, be careful not do any
     /// substantial work here (obviously including any kind of GL calls),
     /// since the destructor gets called frequently on various contexts.
+    HD_API
     virtual ~HdBufferArrayRange();
 
     /// Returns true if this range is valid
@@ -60,6 +66,9 @@ public:
 
     /// Returns true is the range has been assigned to a buffer
     virtual bool IsAssigned() const = 0;
+
+    /// Returns true if this range is marked as immutable.
+    virtual bool IsImmutable() const = 0;
 
     /// Resize memory area for this range. Returns true if it causes container
     /// buffer reallocation.
@@ -87,15 +96,8 @@ public:
     /// drawbatches to be rebuilt to remove expired BufferArrayRange.
     virtual void IncrementVersion() = 0;
 
-    /// Returns the GPU resource. If the buffer array contains more than one
-    /// resource, this method raises a coding error.
-    virtual HdBufferResourceSharedPtr GetResource() const = 0;
-
-    /// Returns the named GPU resource.
-    virtual HdBufferResourceSharedPtr GetResource(TfToken const& name) = 0;
-
-    /// Returns the list of all named GPU resources for this bufferArrayRange.
-    virtual HdBufferResourceNamedList const& GetResources() const = 0;
+    /// Returns the max number of elements
+    virtual size_t GetMaxNumElements() const = 0;
 
     /// Sets the buffer array assosiated with this buffer;
     virtual void SetBufferArray(HdBufferArray *bufferArray) = 0;
@@ -105,11 +107,12 @@ public:
 
     /// Returns true if the underlying buffer array is aggregated to other's
     bool IsAggregatedWith(HdBufferArrayRangeSharedPtr const &other) const {
-        return (other and (_GetAggregation() == other->_GetAggregation()));
+        return (other && (_GetAggregation() == other->_GetAggregation()));
     }
 
     /// Sets the bufferSpecs for all resources.
-    void AddBufferSpecs(HdBufferSpecVector *bufferSpecs) const;
+    HD_API
+    virtual void AddBufferSpecs(HdBufferSpecVector *bufferSpecs) const = 0;
 
 protected:
     /// Returns the aggregation container to be used in IsAggregatedWith()
@@ -117,6 +120,7 @@ protected:
 
 };
 
+HD_API
 std::ostream &operator <<(std::ostream &out,
                           const HdBufferArrayRange &self);
 
@@ -132,14 +136,19 @@ public:
 
     /// Set \p range into the container at \p index.
     /// If the size of container is smaller than index, resize it.
+    HD_API
     void Set(int index, HdBufferArrayRangeSharedPtr const &range);
 
     /// Returns the bar at \p index. returns null if either the index
     // is out of range or not yet set.
+    HD_API
     HdBufferArrayRangeSharedPtr const &Get(int index) const;
 
 private:
     std::vector<HdBufferArrayRangeSharedPtr> _ranges;
 };
+
+
+PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif  // HD_BUFFER_ARRAY_RANGE_H

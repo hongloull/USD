@@ -37,6 +37,9 @@
 
 #include "pxr/base/tf/type.h"
 
+PXR_NAMESPACE_OPEN_SCOPE
+
+
 TF_REGISTRY_FUNCTION(TfType)
 {
     typedef UsdImagingSphereAdapter Adapter;
@@ -46,6 +49,12 @@ TF_REGISTRY_FUNCTION(TfType)
 
 UsdImagingSphereAdapter::~UsdImagingSphereAdapter() 
 {
+}
+
+bool
+UsdImagingSphereAdapter::IsSupported(HdRenderIndex* renderIndex)
+{
+    return renderIndex->IsRprimTypeSupported(HdPrimTypeTokens->mesh);
 }
 
 SdfPath
@@ -64,7 +73,7 @@ UsdImagingSphereAdapter::Populate(UsdPrim const& prim,
 void 
 UsdImagingSphereAdapter::TrackVariabilityPrep(UsdPrim const& prim,
                                               SdfPath const& cachePath,
-                                              int requestedBits,
+                                              HdDirtyBits requestedBits,
                                               UsdImagingInstancerContext const* 
                                                   instancerContext)
 {
@@ -76,8 +85,8 @@ UsdImagingSphereAdapter::TrackVariabilityPrep(UsdPrim const& prim,
 void 
 UsdImagingSphereAdapter::TrackVariability(UsdPrim const& prim,
                                           SdfPath const& cachePath,
-                                          int requestedBits,
-                                          int* dirtyBits,
+                                          HdDirtyBits requestedBits,
+                                          HdDirtyBits* dirtyBits,
                                           UsdImagingInstancerContext const* 
                                               instancerContext)
 {
@@ -89,7 +98,7 @@ UsdImagingSphereAdapter::TrackVariability(UsdPrim const& prim,
     
     UsdTimeCode time(1.0);
     if (requestedBits & HdChangeTracker::DirtyTransform) {
-        if (not (*dirtyBits & HdChangeTracker::DirtyTransform)) {
+        if (!(*dirtyBits & HdChangeTracker::DirtyTransform)) {
             _IsVarying(prim, UsdGeomTokens->radius,
                           HdChangeTracker::DirtyTransform,
                           UsdImagingTokens->usdVaryingXform,
@@ -102,7 +111,7 @@ void
 UsdImagingSphereAdapter::UpdateForTimePrep(UsdPrim const& prim,
                                    SdfPath const& cachePath, 
                                    UsdTimeCode time,
-                                   int requestedBits,
+                                   HdDirtyBits requestedBits,
                                    UsdImagingInstancerContext const* 
                                        instancerContext)
 {
@@ -125,8 +134,8 @@ void
 UsdImagingSphereAdapter::UpdateForTime(UsdPrim const& prim,
                                SdfPath const& cachePath, 
                                UsdTimeCode time,
-                               int requestedBits,
-                               int* resultBits,
+                               HdDirtyBits requestedBits,
+                               HdDirtyBits* resultBits,
                                UsdImagingInstancerContext const* 
                                    instancerContext)
 {
@@ -263,3 +272,6 @@ UsdImagingSphereAdapter::GetMeshTransform(UsdPrim const& prim,
     GfMatrix4d xf(GfVec4d(radius, radius, radius, 1.0));   
     return xf;
 }
+
+PXR_NAMESPACE_CLOSE_SCOPE
+

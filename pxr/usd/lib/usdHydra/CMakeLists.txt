@@ -1,7 +1,7 @@
 set(PXR_PREFIX pxr/usd)
 set(PXR_PACKAGE usdHydra)
 
-pxr_shared_library(usdHydra
+pxr_library(usdHydra
 
     LIBRARIES
         tf
@@ -16,6 +16,9 @@ pxr_shared_library(usdHydra
         uvTexture
         ptexTexture
         tokens
+
+    PUBLIC_HEADERS
+        api.h
 
     CPPFILES
         moduleDeps.cpp

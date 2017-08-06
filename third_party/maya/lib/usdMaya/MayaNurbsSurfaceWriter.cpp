@@ -22,6 +22,7 @@
 // language governing permissions and limitations under the Apache License.
 //
 
+#include "pxr/pxr.h"
 #include "usdMaya/MayaNurbsSurfaceWriter.h"
 
 #include "pxr/usd/usdGeom/nurbsPatch.h"
@@ -36,27 +37,63 @@
 #include <maya/MTrimBoundaryArray.h>
 #include <maya/MPointArray.h>
 
-MayaNurbsSurfaceWriter::MayaNurbsSurfaceWriter(
-        MDagPath & iDag, 
-        UsdStageRefPtr stage, 
-        const JobExportArgs & iArgs) :
-    MayaTransformWriter(iDag, stage, iArgs)
-{
-}
+PXR_NAMESPACE_OPEN_SCOPE
 
-//virtual 
-UsdPrim MayaNurbsSurfaceWriter::write(const UsdTimeCode &usdTimeCode)
+
+MayaNurbsSurfaceWriter::MayaNurbsSurfaceWriter(
+        const MDagPath & iDag,
+        const SdfPath& uPath,
+        bool instanceSource,
+        usdWriteJobCtx& jobCtx) :
+    MayaTransformWriter(iDag, uPath, instanceSource, jobCtx)
 {
-    // == Write
     UsdGeomNurbsPatch primSchema =
         UsdGeomNurbsPatch::Define(getUsdStage(), getUsdPath());
     TF_AXIOM(primSchema);
-    UsdPrim prim = primSchema.GetPrim();
-    TF_AXIOM(prim);
+    mUsdPrim = primSchema.GetPrim();
+    TF_AXIOM(mUsdPrim);
+}
+
+static void
+_FixNormalizedKnotRange(
+    VtArray <double> & knots,
+    const unsigned int numKnots,
+    const unsigned int degree,
+    const double startVal,
+    const double endVal)
+{
+    // ensure we've produced valid knot ranges; the data coming
+    // from Maya is fine but sometimes rounding errors in the normalization
+    // cause problems.  So we change the knots on the boundaries
+    // (whether single or multiple) to match the u/v range.
+    double changeVal;
+
+    if (startVal < knots[degree]) {
+        changeVal = knots[degree];
+        for (unsigned int i = 0; i <= degree; ++i) {
+            if (knots[i] == changeVal) {
+                knots[i] = startVal;
+            }
+        }
+    }
+    if (endVal > knots[numKnots - (degree + 1)]) {
+        changeVal = knots[numKnots - (degree + 1)];
+        for (unsigned int i = numKnots - (degree + 1); i < numKnots; ++i) {
+            if (knots[i] == changeVal) {
+                knots[i] = endVal;
+            }
+        }
+    }
+}
+
+//virtual 
+void MayaNurbsSurfaceWriter::write(const UsdTimeCode &usdTimeCode)
+{
+    // == Write
+    UsdGeomNurbsPatch primSchema(mUsdPrim);
 
     // Write the attrs
     writeNurbsSurfaceAttrs(usdTimeCode, primSchema);
-    return prim;
 }
 
 // virtual
@@ -103,7 +140,7 @@ bool MayaNurbsSurfaceWriter::writeNurbsSurfaceAttrs(
                     dispColor.SetInterpolation(interpolation);
                 }
                 dispColor.Set(RGBData);
-                if (not assignmentIndices.empty()) {
+                if (!assignmentIndices.empty()) {
                     dispColor.SetIndices(assignmentIndices);
                 }
             }
@@ -114,7 +151,7 @@ bool MayaNurbsSurfaceWriter::writeNurbsSurfaceAttrs(
                     dispOpacity.SetInterpolation(interpolation);
                 }
                 dispOpacity.Set(AlphaData);
-                if (not assignmentIndices.empty()) {
+                if (!assignmentIndices.empty()) {
                     dispOpacity.SetIndices(assignmentIndices);
                 }
             }
@@ -171,6 +208,12 @@ bool MayaNurbsSurfaceWriter::writeNurbsSurfaceAttrs(
     for (unsigned int i = 0; i < numKnotsInV; i++) {
         sampKnotsInV[i+1]=(double)((knotsInV[i]-vOffset)*vScale);
     }
+
+    if (getArgs().normalizeNurbs) {
+        _FixNormalizedKnotRange(sampKnotsInU, numKnotsInU+2, nurbs.degreeU(), startU, endU);
+        _FixNormalizedKnotRange(sampKnotsInV, numKnotsInV+2, nurbs.degreeV(), startV, endV);
+    }
+
 
     sampKnotsInU[0] = (2.0 * sampKnotsInU[1] - sampKnotsInU[2]);
     sampKnotsInU[numKnotsInU+1] = (2.0 * sampKnotsInU[numKnotsInU] - 
@@ -406,3 +449,6 @@ MayaNurbsSurfaceWriter::exportsGprims() const
     return true;
 }
     
+
+PXR_NAMESPACE_CLOSE_SCOPE
+

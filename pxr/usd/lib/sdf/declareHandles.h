@@ -26,18 +26,22 @@
 
 /// \file sdf/declareHandles.h
 
+#include "pxr/pxr.h"
+#include "pxr/usd/sdf/api.h"
 #include "pxr/base/arch/demangle.h"
 #include "pxr/base/arch/hints.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/weakPtrFacade.h"
 #include "pxr/base/tf/declarePtrs.h"
+
 #include <set>
 #include <typeinfo>
 #include <vector>
 #include <boost/intrusive_ptr.hpp>
 #include <boost/operators.hpp>
-#include <boost/python/pointee.hpp>
 #include <boost/type_traits/remove_const.hpp>
+
+PXR_NAMESPACE_OPEN_SCOPE
 
 class SdfLayer;
 class SdfSpec;
@@ -139,6 +143,11 @@ public:
         return _spec < other._spec;
     }
 
+    /// Hash.
+    friend size_t hash_value(const This &x) {
+        return hash_value(x._spec);
+    }
+
 private:
     SpecType _spec;
 
@@ -149,23 +158,18 @@ template <class T>
 T*
 get_pointer(const SdfHandle<T>& x)
 {
-    return not x ? 0 : x.operator->();
+    return !x ? 0 : x.operator->();
 }
+
+PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace boost {
 
-using ::get_pointer;
-
-namespace python {
-
-template <typename T>
-struct pointee<SdfHandle<T> > {
-    typedef T type;
-};
+using PXR_NS::get_pointer;
 
 }
 
-}
+PXR_NAMESPACE_OPEN_SCOPE
 
 template <class T>
 struct SdfHandleTo {
@@ -191,7 +195,7 @@ SdfCreateHandle(T *p)
 }
 
 template <>
-SdfHandleTo<SdfLayer>::Handle
+SDF_API SdfHandleTo<SdfLayer>::Handle
 SdfCreateHandle(SdfLayer *p);
 
 template <typename T>
@@ -208,11 +212,11 @@ struct Sdf_CastAccess {
     }
 };
 
-bool 
+SDF_API bool 
 Sdf_CanCastToType(
     const SdfSpec& srcSpec, const std::type_info& destType);
 
-bool
+SDF_API bool
 Sdf_CanCastToTypeCheckSchema(
     const SdfSpec& srcSpec, const std::type_info& destType);
 
@@ -266,8 +270,8 @@ TfStatic_cast(const SdfHandle<SRC>& x)
 {
     typedef typename DST::SpecType Spec;
     typedef SdfHandle<Spec> Handle;
-    BOOST_STATIC_ASSERT(
-        (Sdf_SpecTypesAreDirectlyRelated<Spec, SRC>::value));
+    static_assert(Sdf_SpecTypesAreDirectlyRelated<Spec, SRC>::value,
+                  "Spec and SRC must be directly related.");
 
     return Handle(Sdf_CastAccess::CastSpec<Spec,SRC>(x.GetSpec()));
 }
@@ -330,5 +334,7 @@ typedef std::set<SdfHandleTo<SdfLayer>::Handle> SdfLayerHandleSet;
     typedef SdfHandleTo<class cls>::ConstHandle cls##ConstHandle;        \
     typedef SdfHandleTo<class cls>::Vector cls##HandleVector;            \
     typedef SdfHandleTo<class cls>::ConstVector cls##ConstHandleVector
+
+PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // SDF_DECLAREHANDLES_H

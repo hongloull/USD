@@ -30,17 +30,20 @@
 #include "pxr/base/gf/range3d.h"
 #include "pxr/base/gf/matrix4d.h"
 
-HdSceneDelegate::HdSceneDelegate()
-    : _index(new HdRenderIndex)
-    , _delegateID(SdfPath::AbsoluteRootPath())
-{
-}
+PXR_NAMESPACE_OPEN_SCOPE
 
-HdSceneDelegate::HdSceneDelegate(HdRenderIndexSharedPtr const& parentIndex, 
-                    SdfPath const& delegateID)
+HdSceneDelegate::HdSceneDelegate(HdRenderIndex *parentIndex,
+                                 SdfPath const& delegateID)
     : _index(parentIndex)
     , _delegateID(delegateID)
 {
+    if (!_delegateID.IsAbsolutePath()) {
+        TF_CODING_ERROR("Scene Delegate Id must be an absolute path: %s",
+                        delegateID.GetText());
+
+
+        _delegateID.MakeAbsolutePath(SdfPath::AbsoluteRootPath());
+    }
 }
 
 HdSceneDelegate::~HdSceneDelegate()
@@ -71,11 +74,10 @@ HdSceneDelegate::IsEnabled(TfToken const& option) const
 }
 
 /*virtual*/
-bool
-HdSceneDelegate::IsInCollection(SdfPath const& id, 
-                            TfToken const& collectionName)
+TfToken
+HdSceneDelegate::GetRenderTag(SdfPath const& id, TfToken const& reprName)
 {
-    return true;
+    return HdTokens->geometry;
 }
 
 // -----------------------------------------------------------------------//
@@ -183,7 +185,9 @@ HdSceneDelegate::GetInstancerTransform(SdfPath const &instancerId,
 SdfPath
 HdSceneDelegate::GetPathForInstanceIndex(const SdfPath &protoPrimPath,
                                          int instanceIndex,
-                                         int *absoluteInstanceIndex)
+                                         int *absoluteInstanceIndex,
+                                         SdfPath * rprimPath,
+                                         SdfPathVector *instanceContext)
 {
     return SdfPath();
 }
@@ -211,13 +215,6 @@ HdSceneDelegate::GetDisplacementShaderSource(SdfPath const &shaderId)
         "}\n"
         );
     return shaderSource;
-}
-
-/*virtual*/
-TfTokenVector
-HdSceneDelegate::GetSurfaceShaderParamNames(SdfPath const &shaderId)
-{
-    return TfTokenVector();
 }
 
 /*virtual*/
@@ -260,15 +257,61 @@ HdSceneDelegate::GetTextureResource(SdfPath const& textureId)
     return HdTextureResourceSharedPtr();
 }
 
+// -----------------------------------------------------------------------//
+/// \name Light Aspects
+// -----------------------------------------------------------------------//
+
+/*virtual*/
+VtValue 
+HdSceneDelegate::GetLightParamValue(SdfPath const &id, 
+                                    TfToken const &paramName) 
+{
+    return VtValue();
+}
 
 // -----------------------------------------------------------------------//
 /// \name Camera Aspects
 // -----------------------------------------------------------------------//
+
 /*virtual*/
 std::vector<GfVec4d>
 HdSceneDelegate::GetClipPlanes(SdfPath const& cameraId)
 {
     return std::vector<GfVec4d>();
+}
+
+// -----------------------------------------------------------------------//
+/// \name ExtComputation Aspects
+// -----------------------------------------------------------------------//
+
+/*virtual*/
+void
+HdSceneDelegate::InvokeExtComputation(SdfPath const& computationId,
+                                      HdExtComputationContext *context)
+{
+}
+
+/*virtual*/
+TfTokenVector
+HdSceneDelegate::GetExtComputationInputNames(SdfPath const& id,
+                                             HdExtComputationInputType type)
+{
+    return TfTokenVector();
+}
+
+/*virtual*/
+HdExtComputationInputParams
+HdSceneDelegate::GetExtComputationInputParams(SdfPath const& id,
+                                              TfToken const &inputName)
+{
+    return HdExtComputationInputParams();
+}
+
+/*virtual*/
+TfTokenVector
+HdSceneDelegate::GetExtComputationOutputNames(SdfPath const& id)
+{
+    return TfTokenVector();
 }
 
 
@@ -319,16 +362,23 @@ HdSceneDelegate::GetPrimVarInstanceNames(SdfPath const& id)
     return TfTokenVector();
 }
 
+
 /*virtual*/
-int
-HdSceneDelegate::GetPrimVarDataType(SdfPath const& id, TfToken const& key)
+TfTokenVector
+HdSceneDelegate::GetExtComputationPrimVarNames(
+                                              SdfPath const& id,
+                                              HdInterpolation interpolationMode)
 {
-    return 0;
+    return TfTokenVector();
 }
 
 /*virtual*/
-int
-HdSceneDelegate::GetPrimVarComponents(SdfPath const& id, TfToken const& key)
+HdExtComputationPrimVarDesc
+HdSceneDelegate::GetExtComputationPrimVarDesc(SdfPath const& id,
+                                              TfToken const& varName)
 {
-    return 0;
+    return HdExtComputationPrimVarDesc();
 }
+
+PXR_NAMESPACE_CLOSE_SCOPE
+

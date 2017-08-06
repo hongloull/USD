@@ -27,12 +27,15 @@
 /// \file tf/enum.h
 /// \ingroup group_tf_RuntimeTyping
 
+#include "pxr/pxr.h"
+#include "pxr/base/arch/defines.h"
 #include "pxr/base/arch/demangle.h"
 #include "pxr/base/tf/preprocessorUtils.h"
 #include "pxr/base/tf/safeTypeCompare.h"
+#include "pxr/base/tf/api.h"
 
 #include <boost/operators.hpp>
-#include <boost/preprocessor/punctuation/comma.hpp>
+#include <boost/preprocessor/punctuation/comma_if.hpp>
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/type_traits/is_enum.hpp>
 #include <boost/utility/enable_if.hpp>
@@ -41,6 +44,8 @@
 #include <string>
 #include <typeinfo>
 #include <vector>
+
+PXR_NAMESPACE_OPEN_SCOPE
 
 /// \class TfEnum
 /// \ingroup group_tf_RuntimeTyping
@@ -103,7 +108,7 @@
 ///
 /// // source file
 /// #include "pxr/base/tf/registryManager.h"
-/// TF_REGISTRY_FUNCTION(TfEnum, Season) {
+/// TF_REGISTRY_FUNCTION(TfEnum) {
 ///     // Register the names for the values:
 ///     TF_ADD_ENUM_NAME(SPRING);
 ///     TF_ADD_ENUM_NAME(SUMMER);
@@ -160,7 +165,7 @@ public:
 
     /// True if \c *this and \c t have both the same type and value.
     bool operator==(const TfEnum& t) const {
-        return t._value == _value and
+        return t._value == _value &&
             TfSafeTypeCompare(*t._typeInfo, *_typeInfo);
     }
 
@@ -169,22 +174,22 @@ public:
     /// different types are ordered in a consistent but arbitrary way which
     /// may vary between program runs.
     bool operator<(const TfEnum& t) const {
-        return _typeInfo->before(*t._typeInfo) or
-            (not t._typeInfo->before(*_typeInfo) and _value < t._value);
+        return _typeInfo->before(*t._typeInfo) ||
+            (!t._typeInfo->before(*_typeInfo) && _value < t._value);
     }
 
     /// True if \c *this has been assigned with \c value.
     template <class T>
     typename boost::enable_if<boost::is_enum<T>, bool>::type
     operator==(T value) const {
-        return int(value) == _value and IsA<T>();
+        return int(value) == _value && IsA<T>();
     }
 
     /// False if \c *this has been assigned with \c value.
     template <class T>
     typename boost::enable_if<boost::is_enum<T>, bool>::type
     operator!=(T value) const {
-        return int(value) != _value or not IsA<T>();
+        return int(value) != _value || !IsA<T>();
     }
 
     /// Compare a literal enum value \a val of enum type \a T with TfEnum \a e.
@@ -258,20 +263,20 @@ public:
     /// Returns the name associated with an enumerated value.
     ///
     /// If there is no such name registered, an empty string is returned.
-    static std::string  GetName(TfEnum val);
+    TF_API static std::string  GetName(TfEnum val);
 
     /// Returns the fully-qualified name for an enumerated value.
     ///
     /// This returns a fully-qualified enumerated value name (e.g.,
     /// \c "Season::WINTER") associated with the given value. If there is no
     /// such name registered, an empty string is returned.
-    static std::string  GetFullName(TfEnum val);
+    TF_API static std::string  GetFullName(TfEnum val);
 
     /// Returns the display name for an enumerated value.
     ///
     /// This returns a user interface-suitable string for the given enumerated
     /// value.
-    static std::string  GetDisplayName(TfEnum val);
+    TF_API static std::string  GetDisplayName(TfEnum val);
 
     /// Returns a vector of all the names associated with an enum type.
     ///
@@ -286,7 +291,7 @@ public:
     }
     
     /// \overload
-    static std::vector<std::string> GetAllNames(const std::type_info &ti);
+    TF_API static std::vector<std::string> GetAllNames(const std::type_info &ti);
 
     /// Returns a vector of all the names associated with an enum type.
     ///
@@ -306,6 +311,7 @@ public:
     /// This returns a pointer to the type_info associated with the enum that
     /// has the type name \c typeName.  If no such enum is registered, returns
     /// NULL.
+    TF_API
     static const std::type_info *GetTypeFromName(const std::string& typeName);
 
     /// Returns the enumerated value for a name.
@@ -322,6 +328,7 @@ public:
     /// Returns the enumerated value for a name.
     ///
     /// This is a template-independent version of \c GetValueFromName().
+    TF_API
     static TfEnum GetValueFromName(const std::type_info& ti,
                                    const std::string &name,
                                    bool *foundIt = NULL);
@@ -335,6 +342,7 @@ public:
     /// set to \c true if the name was found and \c false
     /// otherwise. Also, since this is not a templated function, it has
     /// to return a generic value type, so we use \c TfEnum.
+    TF_API
     static TfEnum GetValueFromFullName(const std::string &fullname,
                                        bool *foundIt = NULL);
 
@@ -342,6 +350,7 @@ public:
     ///
     /// If any enum whose demangled type name is \p typeName has been
     /// added via \c TF_ADD_ENUM_NAME(), this function returns true.
+    TF_API
     static bool IsKnownEnumType(const std::string& typeName);
 
     ///@}
@@ -351,6 +360,7 @@ public:
     /// \warning This method is called by the \c TF_ADD_ENUM_NAME() macro, and
     /// should NOT be called directly. Instead, call AddName(), which does
     /// exactly the same thing.
+    TF_API
     static void _AddName(TfEnum val, const std::string &valName,
                          const std::string &displayName="");
 
@@ -379,20 +389,20 @@ private:
 
     // Internal constructor for size_t values.
     explicit TfEnum(size_t value)
-        : _typeInfo(&typeid(size_t)), _value(value)
+        : _typeInfo(&typeid(size_t)), _value(static_cast<int>(value))
     {
     }
 
+    TF_API
     void _FatalGetValueError(std::type_info const& typeInfo) const;
 
     const std::type_info* _typeInfo;
     int _value;
 };
 
-
 /// Output a TfEnum value.
 /// \ingroup group_tf_DebuggingOutput
-std::ostream& operator<<(std::ostream& out, const TfEnum & e);
+TF_API std::ostream& operator<<(std::ostream& out, const TfEnum & e);
 
 /// Macro used to associate a name with an enumerated value.
 ///
@@ -425,4 +435,6 @@ std::ostream& operator<<(std::ostream& out, const TfEnum & e);
                      BOOST_PP_COMMA_IF(TF_NUM_ARGS(__VA_ARGS__))        \
                      __VA_ARGS__)
 
-#endif
+PXR_NAMESPACE_CLOSE_SCOPE
+
+#endif // TF_ENUM_H

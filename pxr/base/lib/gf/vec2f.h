@@ -31,7 +31,9 @@
 /// \file gf/vec2f.h
 /// \ingroup group_gf_LinearAlgebra
 
+#include "pxr/pxr.h"
 #include "pxr/base/tf/diagnostic.h"
+#include "pxr/base/gf/api.h"
 #include "pxr/base/gf/limits.h"
 #include "pxr/base/gf/traits.h"
 #include "pxr/base/gf/math.h"
@@ -42,6 +44,10 @@
 #include <cmath>
 
 #include <iosfwd>
+
+PXR_NAMESPACE_OPEN_SCOPE
+
+class GfVec2f;
 
 template <>
 struct GfIsGfVec<class GfVec2f> { static const bool value = true; };
@@ -147,7 +153,7 @@ public:
 
     /// Equality comparison.
     bool operator==(GfVec2f const &other) const {
-        return _data[0] == other[0] and
+        return _data[0] == other[0] &&
                _data[1] == other[1];
     }
     bool operator!=(GfVec2f const &other) const {
@@ -156,10 +162,13 @@ public:
 
     // TODO Add inequality for other vec types...
     /// Equality comparison.
+    GF_API
     bool operator==(class GfVec2d const &other) const;
     /// Equality comparison.
+    GF_API
     bool operator==(class GfVec2h const &other) const;
     /// Equality comparison.
+    GF_API
     bool operator==(class GfVec2i const &other) const;
     
     /// Create a vec with negated elements.
@@ -274,11 +283,35 @@ private:
 
 /// Output a GfVec2f.
 /// \ingroup group_gf_DebuggingOutput
-std::ostream& operator<<(std::ostream &, GfVec2f const &);
+GF_API std::ostream& operator<<(std::ostream &, GfVec2f const &);
+
+
+PXR_NAMESPACE_CLOSE_SCOPE
 
 #include "pxr/base/gf/vec2d.h"
 #include "pxr/base/gf/vec2h.h"
 #include "pxr/base/gf/vec2i.h"
+
+PXR_NAMESPACE_OPEN_SCOPE
+
+inline
+GfVec2f::GfVec2f(class GfVec2d const &other)
+{
+    _data[0] = other[0];
+    _data[1] = other[1];
+}
+inline
+GfVec2f::GfVec2f(class GfVec2h const &other)
+{
+    _data[0] = other[0];
+    _data[1] = other[1];
+}
+inline
+GfVec2f::GfVec2f(class GfVec2i const &other)
+{
+    _data[0] = other[0];
+    _data[1] = other[1];
+}
 
 /// Returns component-wise multiplication of vectors \p v1 and \p v2.
 inline GfVec2f
@@ -361,4 +394,6 @@ GfIsClose(GfVec2f const &v1, GfVec2f const &v2, double tolerance)
 
  
  
+PXR_NAMESPACE_CLOSE_SCOPE
+
 #endif // GF_VEC2F_H

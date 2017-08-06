@@ -38,6 +38,9 @@
 
 #include "pxr/base/tf/type.h"
 
+PXR_NAMESPACE_OPEN_SCOPE
+
+
 TF_REGISTRY_FUNCTION(TfType)
 {
     typedef UsdImagingCubeAdapter Adapter;
@@ -47,6 +50,12 @@ TF_REGISTRY_FUNCTION(TfType)
 
 UsdImagingCubeAdapter::~UsdImagingCubeAdapter() 
 {
+}
+
+bool
+UsdImagingCubeAdapter::IsSupported(HdRenderIndex* renderIndex)
+{
+    return renderIndex->IsRprimTypeSupported(HdPrimTypeTokens->mesh);
 }
 
 SdfPath
@@ -65,7 +74,7 @@ UsdImagingCubeAdapter::Populate(UsdPrim const& prim,
 void 
 UsdImagingCubeAdapter::TrackVariabilityPrep(UsdPrim const& prim,
                                             SdfPath const& cachePath,
-                                            int requestedBits,
+                                            HdDirtyBits requestedBits,
                                             UsdImagingInstancerContext const* 
                                                 instancerContext)
 {
@@ -77,8 +86,8 @@ UsdImagingCubeAdapter::TrackVariabilityPrep(UsdPrim const& prim,
 void 
 UsdImagingCubeAdapter::TrackVariability(UsdPrim const& prim,
                                         SdfPath const& cachePath,
-                                        int requestedBits,
-                                        int* dirtyBits,
+                                        HdDirtyBits requestedBits,
+                                        HdDirtyBits* dirtyBits,
                                         UsdImagingInstancerContext const* 
                                             instancerContext)
 {
@@ -90,7 +99,7 @@ UsdImagingCubeAdapter::TrackVariability(UsdPrim const& prim,
     
     UsdTimeCode time(1.0);
     if (requestedBits & HdChangeTracker::DirtyTransform) {
-        if (not (*dirtyBits & HdChangeTracker::DirtyTransform)) {
+        if (!(*dirtyBits & HdChangeTracker::DirtyTransform)) {
             _IsVarying(prim, UsdGeomTokens->size,
                           HdChangeTracker::DirtyTransform,
                           UsdImagingTokens->usdVaryingXform,
@@ -103,7 +112,7 @@ void
 UsdImagingCubeAdapter::UpdateForTimePrep(UsdPrim const& prim,
                                          SdfPath const& cachePath, 
                                          UsdTimeCode time,
-                                         int requestedBits,
+                                         HdDirtyBits requestedBits,
                                          UsdImagingInstancerContext const* 
                                              instancerContext)
 {
@@ -121,8 +130,8 @@ void
 UsdImagingCubeAdapter::UpdateForTime(UsdPrim const& prim,
                                      SdfPath const& cachePath, 
                                      UsdTimeCode time,
-                                     int requestedBits,
-                                     int* resultBits,
+                                     HdDirtyBits requestedBits,
+                                     HdDirtyBits* resultBits,
                                      UsdImagingInstancerContext const* 
                                          instancerContext)
 {
@@ -216,3 +225,6 @@ UsdImagingCubeAdapter::GetMeshTransform(UsdPrim const& prim,
     GfMatrix4d xf(GfVec4d(size, size, size, 1.0));
     return xf;
 }
+
+PXR_NAMESPACE_CLOSE_SCOPE
+

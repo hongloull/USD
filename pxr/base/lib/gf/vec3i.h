@@ -31,7 +31,9 @@
 /// \file gf/vec3i.h
 /// \ingroup group_gf_LinearAlgebra
 
+#include "pxr/pxr.h"
 #include "pxr/base/tf/diagnostic.h"
+#include "pxr/base/gf/api.h"
 #include "pxr/base/gf/limits.h"
 #include "pxr/base/gf/traits.h"
 
@@ -40,6 +42,10 @@
 #include <cstddef>
 
 #include <iosfwd>
+
+PXR_NAMESPACE_OPEN_SCOPE
+
+class GfVec3i;
 
 template <>
 struct GfIsGfVec<class GfVec3i> { static const bool value = true; };
@@ -145,8 +151,8 @@ public:
 
     /// Equality comparison.
     bool operator==(GfVec3i const &other) const {
-        return _data[0] == other[0] and
-               _data[1] == other[1] and
+        return _data[0] == other[0] &&
+               _data[1] == other[1] &&
                _data[2] == other[2];
     }
     bool operator!=(GfVec3i const &other) const {
@@ -155,10 +161,13 @@ public:
 
     // TODO Add inequality for other vec types...
     /// Equality comparison.
+    GF_API
     bool operator==(class GfVec3d const &other) const;
     /// Equality comparison.
+    GF_API
     bool operator==(class GfVec3f const &other) const;
     /// Equality comparison.
+    GF_API
     bool operator==(class GfVec3h const &other) const;
     
     /// Create a vec with negated elements.
@@ -247,7 +256,7 @@ private:
 
 /// Output a GfVec3i.
 /// \ingroup group_gf_DebuggingOutput
-std::ostream& operator<<(std::ostream &, GfVec3i const &);
+GF_API std::ostream& operator<<(std::ostream &, GfVec3i const &);
 
 
 /// Returns component-wise multiplication of vectors \p v1 and \p v2.
@@ -277,4 +286,6 @@ GfDot(GfVec3i const &v1, GfVec3i const &v2) {
 }
 
  
+PXR_NAMESPACE_CLOSE_SCOPE
+
 #endif // GF_VEC3I_H

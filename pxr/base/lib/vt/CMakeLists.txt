@@ -1,20 +1,17 @@
 set(PXR_PREFIX pxr/base)
 set(PXR_PACKAGE vt)
 
-pxr_shared_library(vt
+pxr_library(vt
     LIBRARIES
         arch
         tf
         gf
         tracelite
         ${Boost_PYTHON_LIBRARY}
-        ${DOUBLE_CONVERSION_LIBRARY}
         ${TBB_tbb_LIBRARY}
-        ${TBB_tbbmalloc_LIBRARY}
 
     INCLUDE_DIRS
         ${Boost_INCLUDE_DIRS}
-        ${DOUBLE_CONVERSION_INCLUDE_DIR}
         ${TBB_INCLUDE_DIRS}
 
     PUBLIC_CLASSES
@@ -31,8 +28,10 @@ pxr_shared_library(vt
         wrapArray
 
     PUBLIC_HEADERS
+        api.h
         traits.h
         operators.h
+        pyOperators.h
         PRIVATE_CLASSES
         PRIVATE_HEADERS
         typeHeaders.h
@@ -71,7 +70,7 @@ pxr_test_scripts(
     testenv/testVtValue.py
     testenv/testVtFunctions.py
 )
-pxr_register_test(testVtvalue
+pxr_register_test(testVtValue
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testVtValue"
 )

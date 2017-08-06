@@ -1,17 +1,15 @@
 set(PXR_PREFIX pxr/usdImaging)
 set(PXR_PACKAGE usdviewq)
 
-if (NOT QT4_FOUND)
-    message(WARNING "Not building ${PXR_PACKAGE} because of missing dependency: Qt4")
-    return()
-endif()
-
 if (NOT PYSIDE_FOUND)
     message(WARNING "Not building ${PXR_PACKAGE} because of missing dependency: PySide")
     return()
+elseif(NOT PYOPENGL_FOUND)
+    message(WARNING "Not building ${PXR_PACKAGE} because of missing dependency: PyOpenGL")
+    return()
 endif()
 
-pxr_shared_library(usdviewq
+pxr_library(usdviewq
     LIBRARIES
         tf
         usd
@@ -26,6 +24,9 @@ pxr_shared_library(usdviewq
 
     CPPFILES
         moduleDeps.cpp
+        
+    PUBLIC_HEADERS
+        api.h
 
     PYMODULE_CPPFILES
         module.cpp
@@ -36,6 +37,7 @@ pxr_shared_library(usdviewq
         arrayAttributeView.py
         customAttributes.py
         mainWindow.py
+        plugContext.py
         scalarTypes.py
         stageView.py
         usdviewContextMenuItem.py
@@ -49,22 +51,20 @@ pxr_shared_library(usdviewq
         settings.py
         watchWindow.py
         adjustClipping.py
+        adjustDefaultMaterial.py
         nodeViewItem.py
         common.py
         attributeValueEditor.py
         pythonExpressionPrompt.py
         referenceEditor.py
         overridableLineEdit.py
-        icons/branch-closed.png
-        icons/branch-closed-selected.png
-        icons/branch-open.png
-        icons/branch-open-selected.png
         usdviewstyle.qss
 
     PYSIDE_UI_FILES
         mainWindowUI.ui
         watchWindowUI.ui
         adjustClippingUI.ui
+        adjustDefaultMaterialUI.ui
         attributeValueEditorUI.ui
         pythonExpressionPromptUI.ui
         referenceEditorUI.ui

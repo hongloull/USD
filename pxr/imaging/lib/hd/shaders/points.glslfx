@@ -69,7 +69,6 @@ in VertexData
     vec4 Peye;
 } inData;
 
-vec3 SimpleLighting(in vec3 Peye, in vec3 Neye, in vec3 color);
 vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord);
 
 void main(void)
@@ -78,7 +77,11 @@ void main(void)
     // camera facing.
     vec3 Neye = vec3(0, 0, 1);
 
+#ifdef HD_HAS_color
     vec4 color = HdGet_color();
+#else
+    vec4 color = vec4(1);
+#endif
 
     color.rgb = ApplyColorOverrides(color).rgb;
 

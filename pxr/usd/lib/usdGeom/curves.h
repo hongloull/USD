@@ -26,6 +26,8 @@
 
 /// \file usdGeom/curves.h
 
+#include "pxr/pxr.h"
+#include "pxr/usd/usdGeom/api.h"
 #include "pxr/usd/usdGeom/pointBased.h"
 #include "pxr/usd/usd/prim.h"
 #include "pxr/usd/usd/stage.h"
@@ -40,6 +42,8 @@
 #include "pxr/base/tf/token.h"
 #include "pxr/base/tf/type.h"
 
+PXR_NAMESPACE_OPEN_SCOPE
+
 class SdfAssetPath;
 
 // -------------------------------------------------------------------------- //
@@ -48,8 +52,12 @@ class SdfAssetPath;
 
 /// \class UsdGeomCurves
 ///
-/// Base class for BasisCurves (RiCurves) and NurbsCurves
-/// (MayaCurves).
+/// Base class for BasisCurves and NurbsCurves.  The BasisCurves
+/// schema is designed to be analagous to RenderMan's RiCurves 
+/// and RiBasis, while the NurbsCurve schema is designed to be 
+/// analgous to  the NURBS curves found in packages like Maya 
+/// and Houdini while retaining their consistency with the 
+/// RenderMan specification for NURBS Patches.
 ///
 class UsdGeomCurves : public UsdGeomPointBased
 {
@@ -78,11 +86,13 @@ public:
     }
 
     /// Destructor.
+    USDGEOM_API
     virtual ~UsdGeomCurves();
 
     /// Return a vector of names of all pre-declared attributes for this schema
     /// class and all its ancestor classes.  Does not include attributes that
     /// may be authored by custom/extended methods of the schemas involved.
+    USDGEOM_API
     static const TfTokenVector &
     GetSchemaAttributeNames(bool includeInherited=true);
 
@@ -95,6 +105,7 @@ public:
     /// UsdGeomCurves(stage->GetPrimAtPath(path));
     /// \endcode
     ///
+    USDGEOM_API
     static UsdGeomCurves
     Get(const UsdStagePtr &stage, const SdfPath &path);
 
@@ -102,11 +113,13 @@ public:
 private:
     // needs to invoke _GetStaticTfType.
     friend class UsdSchemaRegistry;
+    USDGEOM_API
     static const TfType &_GetStaticTfType();
 
     static bool _IsTypedSchema();
 
     // override SchemaBase virtuals.
+    USDGEOM_API
     virtual const TfType &_GetTfType() const;
 
 public:
@@ -122,6 +135,7 @@ public:
     /// \n  Usd Type: SdfValueTypeNames->IntArray
     /// \n  Variability: SdfVariabilityVarying
     /// \n  Fallback Value: No Fallback
+    USDGEOM_API
     UsdAttribute GetCurveVertexCountsAttr() const;
 
     /// See GetCurveVertexCountsAttr(), and also 
@@ -129,6 +143,7 @@ public:
     /// If specified, author \p defaultValue as the attribute's default,
     /// sparsely (when it makes sense to do so) if \p writeSparsely is \c true -
     /// the default for \p writeSparsely is \c false.
+    USDGEOM_API
     UsdAttribute CreateCurveVertexCountsAttr(VtValue const &defaultValue = VtValue(), bool writeSparsely=false) const;
 
 public:
@@ -146,6 +161,7 @@ public:
     /// \n  Usd Type: SdfValueTypeNames->FloatArray
     /// \n  Variability: SdfVariabilityVarying
     /// \n  Fallback Value: No Fallback
+    USDGEOM_API
     UsdAttribute GetWidthsAttr() const;
 
     /// See GetWidthsAttr(), and also 
@@ -153,6 +169,7 @@ public:
     /// If specified, author \p defaultValue as the attribute's default,
     /// sparsely (when it makes sense to do so) if \p writeSparsely is \c true -
     /// the default for \p writeSparsely is \c false.
+    USDGEOM_API
     UsdAttribute CreateWidthsAttr(VtValue const &defaultValue = VtValue(), bool writeSparsely=false) const;
 
 public:
@@ -160,8 +177,10 @@ public:
     // Feel free to add custom code below this line, it will be preserved by 
     // the code generator. 
     //
-    // Just remember to close the class delcaration with }; and complete the
-    // include guard with #endif
+    // Just remember to: 
+    //  - Close the class declaration with }; 
+    //  - Close the namespace with PXR_NAMESPACE_CLOSE_SCOPE
+    //  - Close the include guard with #endif
     // ===================================================================== //
     // --(BEGIN CUSTOM CODE)--
 
@@ -173,6 +192,7 @@ public:
     /// it does require an interpolation specification.  The fallback
     /// interpolation, if left unspecified, is UsdGeomTokens->varying , 
     /// which means a width value is specified at the end of each curve segment.
+    USDGEOM_API
     TfToken GetWidthsInterpolation() const;
 
     /// Set the \ref Usd_InterpolationVals "interpolation" for the \em widths
@@ -185,6 +205,7 @@ public:
     /// to match its interpolation to its prim's topology.
     ///
     /// \sa GetWidthsInterpolation()
+    USDGEOM_API
     bool SetWidthsInterpolation(TfToken const &interpolation);
 
     /// Compute the extent for the curves defined by points and widths.
@@ -197,8 +218,11 @@ public:
     /// This function is to provide easy authoring of extent for usd authoring 
     /// tools, hence it is static and acts outside a specific prim (as in 
     /// attribute based methods).
+    USDGEOM_API
     static bool ComputeExtent(const VtVec3fArray& points,
         const VtFloatArray& widths, VtVec3fArray* extent);
 };
+
+PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif

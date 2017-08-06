@@ -28,10 +28,15 @@
 /// \ingroup group_arch_Strings
 /// Architecture dependent memory-safe sprintf capability
 
+#include "pxr/pxr.h"
+#include "pxr/base/arch/api.h"
 #include "pxr/base/arch/attributes.h"
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <string>
+
+PXR_NAMESPACE_OPEN_SCOPE
 
 /// \addtogroup group_arch_Strings
 ///@{
@@ -48,6 +53,7 @@
 /// You probably want to use the functionality of this call via
 /// \c TfStringPrintf().
 ///
+ARCH_API
 int ArchVsnprintf(char *str, size_t size, const char *format, va_list ap)
 #ifndef doxygen
     ARCH_PRINTF_FUNCTION(3, 0)
@@ -70,6 +76,7 @@ int ArchVsnprintf(char *str, size_t size, const char *format, va_list ap)
 /// into \c ArchStringPrintf() as in the above example (i.e. \c caller.c_str()
 /// as opposed to just passing \c caller).
 ///
+ARCH_API
 std::string ArchStringPrintf(const char *fmt, ...)
 #ifndef doxygen
     ARCH_PRINTF_FUNCTION(1, 2)
@@ -84,6 +91,7 @@ std::string ArchStringPrintf(const char *fmt, ...)
 /// the value of \c ap is undefined after the call. A functions that calls \c
 /// ArchVStringPrintf() should call \c va_end(ap) itself afterwards.
 ///
+ARCH_API
 std::string ArchVStringPrintf(const char *fmt, va_list ap)
 #ifndef doxygen
     ARCH_PRINTF_FUNCTION(1, 0)
@@ -91,5 +99,7 @@ std::string ArchVStringPrintf(const char *fmt, va_list ap)
 #endif
 
 /// @}
+
+PXR_NAMESPACE_CLOSE_SCOPE
     
 #endif // ARCH_VSNPRINTF_H

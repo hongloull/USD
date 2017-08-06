@@ -4,27 +4,28 @@ set(CMAKE_INCLUDE_CURRENT_DIR OFF)
 set(PXR_PACKAGE tf)
 set(PXR_PREFIX pxr/base)
 
-pxr_shared_library(tf
+if(WIN32)
+    set(WINLIBS Shlwapi.lib)
+endif()
+
+pxr_library(tf
     LIBRARIES
         arch
+        ${WINLIBS}
         ${PYTHON_LIBRARIES}
         ${Boost_PYTHON_LIBRARY}
-        ${Boost_IOSTREAMS_LIBRARY}
-        ${DOUBLE_CONVERSION_LIBRARY}
+        ${Boost_DATE_TIME_LIBRARY}
         ${TBB_tbb_LIBRARY}
-        ${TBB_tbbmalloc_LIBRARY}
 
     INCLUDE_DIRS
         ${PYTHON_INCLUDE_DIR}
         ${Boost_INCLUDE_DIRS}
         ${TBB_INCLUDE_DIRS}
-        ${DOUBLE_CONVERSION_INCLUDE_DIR}
 
     PUBLIC_CLASSES
         anyWeakPtr
         atomicOfstreamWrapper
         bitUtils
-        callContext
         copyOnWritePtr
         debug
         debugNotice
@@ -57,8 +58,10 @@ pxr_shared_library(tf
         patternMatcher
         pointerAndBits
         poolAllocator
+        pyAnnotatedBoolResult
         pyArg
         pyCall
+        pyCallContext
         pyClassMethod
         pyContainerConversions
         pyEnum
@@ -115,11 +118,11 @@ pxr_shared_library(tf
         wrapTypeHelpers
 
     PUBLIC_HEADERS
+        api.h
+        callContext.h
         cxxCast.h
         declarePtrs.h
         diagnosticLite.h
-        executeAtStartup.h
-        executeAtUnload.h
         hashmap.h
         hashset.h
         instantiateSingleton.h
@@ -139,10 +142,30 @@ pxr_shared_library(tf
         noticeRegistry
         pyErrorInternal
 
+    PRIVATE_HEADERS 
+        pxrDoubleConversion/ieee.h
+        pxrDoubleConversion/utils.h
+        pxrDoubleConversion/double-conversion.h
+        pxrDoubleConversion/bignum-dtoa.h
+        pxrDoubleConversion/bignum.h
+        pxrDoubleConversion/cached-powers.h
+        pxrDoubleConversion/diy-fp.h
+        pxrDoubleConversion/fast-dtoa.h
+        pxrDoubleConversion/fixed-dtoa.h
+        pxrDoubleConversion/strtod.h
+
     CPPFILES
         initConfig.cpp
         moduleDeps.cpp
         preprocessorUtils.cpp
+        pxrDoubleConversion/double-conversion.cc
+        pxrDoubleConversion/bignum-dtoa.cc
+        pxrDoubleConversion/bignum.cc
+        pxrDoubleConversion/cached-powers.cc
+        pxrDoubleConversion/diy-fp.cc
+        pxrDoubleConversion/fast-dtoa.cc
+        pxrDoubleConversion/fixed-dtoa.cc
+        pxrDoubleConversion/strtod.cc
 
     PYMODULE_CPPFILES
         module.cpp
@@ -173,6 +196,7 @@ pxr_shared_library(tf
         wrapStopwatch.cpp
         wrapStringUtils.cpp
         wrapTemplateString.cpp
+        wrapTestPyAnnotatedBoolResult.cpp
         wrapTestPyContainerConversions.cpp
         wrapTestPyDateTime.cpp
         wrapTestPyStaticTokens.cpp
@@ -196,12 +220,20 @@ pxr_shared_library(tf
         testenv/testTfScriptModuleLoader_Unknown.py
 )
 
+pxr_build_test(testTfPyFunction
+    LIBRARIES
+        tf
+        ${Boost_PYTHON_LIBRARY}
+    CPPFILES
+        testenv/testTfPyFunction.cpp
+) 
+
 pxr_build_test(testTfPyInterpreter
     LIBRARIES
         tf
     CPPFILES
         testenv/testTfPyInterpreter.cpp
-) 
+)
 
 pxr_build_test(testTfPyLock
     LIBRARIES
@@ -209,40 +241,40 @@ pxr_build_test(testTfPyLock
         ${Boost_PYTHON_LIBRARY}
     CPPFILES
         testenv/testTfPyLock.cpp
-) 
+)
 
 pxr_build_test(testTfSIGFPE
     LIBRARIES
         tf
     CPPFILES
         testenv/SIGFPE.cpp
-) 
+)
 
 pxr_build_test(testTfSIGSEGV
     LIBRARIES
         tf
     CPPFILES
         testenv/SIGSEGV.cpp
-) 
+)
 
 pxr_build_test_shared_lib(TestTfDl
     CPPFILES
         testenv/TestTfDl.cpp
-) 
+)
 
 pxr_build_test_shared_lib(TestTfRegistryFunctionPlugin
     LIBRARIES
-        tf  
+        tf
     CPPFILES
         testenv/TestTfRegistryFunctionPlugin.cpp
-) 
+)
 
 pxr_build_test(testTfCast
     LIBRARIES
         tf
     CPPFILES
         testenv/testTfCast.cpp
-) 
+)
 
 pxr_build_test(testTf
     LIBRARIES
@@ -293,6 +325,7 @@ pxr_build_test(testTf
 pxr_test_scripts(
     testenv/testTfCrashHandler.py
     testenv/testTfFileUtils.py
+    testenv/testTfNamedTemporaryFile.py
     testenv/testTfPathUtils.py
     testenv/testTfPython.py
     testenv/testTfPyDateTime.py
@@ -312,6 +345,10 @@ pxr_install_test_dir(
     SRC testenv/baseline/TfDebug
     DEST TfDebug/baseline
 )
+# These tests will depend on downstream libraries when built monolithic.
+# We don't want changes to those libraries to affect test results so we
+# simply disable these tests in that case.
+if(NOT PXR_BUILD_MONOLITHIC)
 pxr_install_test_dir(
     SRC testenv/baseline/TfDebugTestEnv
     DEST TfDebugTestEnv/baseline
@@ -320,6 +357,7 @@ pxr_install_test_dir(
     SRC testenv/baseline/TfDebugTestEnvList
     DEST TfDebugTestEnvList/baseline
 )
+endif()
 pxr_install_test_dir(
     SRC testenv/baseline/TfDiagnosticNotice_Fatal
     DEST TfDiagnosticNotice_Fatal/baseline
@@ -379,21 +417,26 @@ pxr_register_test(TfDebugFatal_4
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfDebugFatal_4"
     EXPECTED_RETURN_CODE 134
 )
+# These tests will depend on downstream libraries when built monolithic.
+# We don't want changes to those libraries to affect test results so we
+# simply disable these tests in that case.
+if(NOT PXR_BUILD_MONOLITHIC)
 pxr_register_test(TfDebugTestEnv
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfDebugTestEnv"
     ENV TF_DEBUG="FOO* FLAM_* FLAM -FOOFLIMFLAM TF_DISCOVERY_D*"
     STDOUT_REDIRECT debugTestEnv.out
     DIFF_COMPARE debugTestEnv.out
 )
-pxr_register_test(TfDebugTestEnvHelp
-    ENV TF_DEBUG=help
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfDebugTestEnvHelp"
-)
 pxr_register_test(TfDebugTestEnvList
     ENV TF_DEBUG=list
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfDebugTestEnvList"
     STDOUT_REDIRECT debugTestEnvList.out
     DIFF_COMPARE debugTestEnvList.out
+)
+endif()
+pxr_register_test(TfDebugTestEnvHelp
+    ENV TF_DEBUG=help
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfDebugTestEnvHelp"
 )
 pxr_register_test(TfDenseHashMap
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfDenseHashMap"
@@ -407,10 +450,12 @@ pxr_register_test(TfErrorThreadTransport
 )
 pxr_register_test(TfDiagnosticNotices
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfDiagnosticNotices"
+    CLEAN_OUTPUT "${PROJECT_SOURCE_DIR}/" 
     DIFF_COMPARE output.txt
 )
 pxr_register_test(TfDiagnosticNotice_Fatal
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfDiagnosticNotice_Fatal"
+    CLEAN_OUTPUT "${PROJECT_SOURCE_DIR}/"
     EXPECTED_RETURN_CODE 134
     DIFF_COMPARE output_fatal.txt
 )
@@ -449,10 +494,12 @@ pxr_register_test(TfHash
 pxr_register_test(TfIterator
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfIterator"
 )
-pxr_register_test(TfMallocTag
-    ENV GLIBCXX_FORCE_NEW=1
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfMallocTag"
-)
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    pxr_register_test(TfMallocTag
+        ENV GLIBCXX_FORCE_NEW=1
+        COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfMallocTag"
+    )
+endif()
 pxr_register_test(TfRefPtr
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfRefPtr"
 )
@@ -465,6 +512,10 @@ pxr_register_test(TfNotice
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfNotice"
     STDOUT_REDIRECT notice.out
     DIFF_COMPARE notice.out
+)
+pxr_register_test(TfNamedTemporaryFile
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTfNamedTemporaryFile"
 )
 pxr_register_test(TfPathUtils
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfPathUtils"
@@ -489,6 +540,7 @@ pxr_register_test(TfRegistryManager
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfRegistryManager"
 )
 pxr_register_test(TfRegistryManagerUnload
+    REQUIRES_SHARED_LIBS
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfRegistryManagerUnload"
 )
 pxr_register_test(TfRegTest
@@ -564,6 +616,10 @@ pxr_register_test(TfWeakPtrConversion
 pxr_register_test(testTfPython
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTfPython"
+)
+pxr_register_test(testTfPyFunction
+    REQUIRES_PYTHON_MODULES
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTfPyFunction"
 )
 pxr_register_test(testTfPyNotice
     PYTHON

@@ -39,6 +39,9 @@
 
 #include <cmath>
 
+PXR_NAMESPACE_OPEN_SCOPE
+
+
 TF_REGISTRY_FUNCTION(TfType)
 {
     typedef UsdImagingCylinderAdapter Adapter;
@@ -48,6 +51,12 @@ TF_REGISTRY_FUNCTION(TfType)
 
 UsdImagingCylinderAdapter::~UsdImagingCylinderAdapter() 
 {
+}
+
+bool
+UsdImagingCylinderAdapter::IsSupported(HdRenderIndex* renderIndex)
+{
+    return renderIndex->IsRprimTypeSupported(HdPrimTypeTokens->mesh);
 }
 
 SdfPath
@@ -67,7 +76,7 @@ UsdImagingCylinderAdapter::Populate(UsdPrim const& prim,
 void 
 UsdImagingCylinderAdapter::TrackVariabilityPrep(UsdPrim const& prim,
                                               SdfPath const& cachePath,
-                                              int requestedBits,
+                                              HdDirtyBits requestedBits,
                                               UsdImagingInstancerContext const* 
                                                   instancerContext)
 {
@@ -79,8 +88,8 @@ UsdImagingCylinderAdapter::TrackVariabilityPrep(UsdPrim const& prim,
 void 
 UsdImagingCylinderAdapter::TrackVariability(UsdPrim const& prim,
                                           SdfPath const& cachePath,
-                                          int requestedBits,
-                                          int* dirtyBits,
+                                          HdDirtyBits requestedBits,
+                                          HdDirtyBits* dirtyBits,
                                           UsdImagingInstancerContext const* 
                                               instancerContext)
 {
@@ -91,7 +100,7 @@ UsdImagingCylinderAdapter::TrackVariability(UsdPrim const& prim,
     // container during update.
     
     if (requestedBits & HdChangeTracker::DirtyPoints) {
-        if (not _IsVarying(prim, 
+        if (!_IsVarying(prim, 
                            UsdGeomTokens->radius,
                            HdChangeTracker::DirtyPoints,
                            UsdImagingTokens->usdVaryingPrimVar,
@@ -111,7 +120,7 @@ void
 UsdImagingCylinderAdapter::UpdateForTimePrep(UsdPrim const& prim,
                                    SdfPath const& cachePath, 
                                    UsdTimeCode time,
-                                   int requestedBits,
+                                   HdDirtyBits requestedBits,
                                    UsdImagingInstancerContext const* 
                                        instancerContext)
 {
@@ -134,8 +143,8 @@ void
 UsdImagingCylinderAdapter::UpdateForTime(UsdPrim const& prim,
                                SdfPath const& cachePath, 
                                UsdTimeCode time,
-                               int requestedBits,
-                               int* resultBits,
+                               HdDirtyBits requestedBits,
+                               HdDirtyBits* resultBits,
                                UsdImagingInstancerContext const* 
                                    instancerContext)
 {
@@ -302,7 +311,7 @@ _GenerateCylinderMeshTopology()
         indices[index++] = top;
     }
 
-    TF_VERIFY(face == numCounts and index == numIndices);
+    TF_VERIFY(face == numCounts && index == numIndices);
 
     return HdMeshTopology(PxOsdOpenSubdivTokens->catmark,
                           HdTokens->rightHanded,
@@ -318,3 +327,6 @@ UsdImagingCylinderAdapter::GetMeshTopology()
 
     return VtValue(cylinderTopo);
 }
+
+PXR_NAMESPACE_CLOSE_SCOPE
+

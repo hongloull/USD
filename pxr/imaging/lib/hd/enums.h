@@ -24,6 +24,10 @@
 #ifndef HD_ENUMS_H
 #define HD_ENUMS_H
 
+#include "pxr/pxr.h"
+
+PXR_NAMESPACE_OPEN_SCOPE
+
 /// \enum HdCompareFunction
 ///
 /// Abstraction of the Graphics compare functions.
@@ -45,6 +49,9 @@ enum HdCompareFunction
 /// \enum HdCullStyle
 ///
 /// Face culling options.
+///
+/// DontCare indicates this prim doesn't determine what should be culled.
+/// Any other CullStyle opinion will override this (such as from the viewer).
 ///
 /// BackUnlessDoubleSided and FrontUnlessDoubleSided will only cull back or
 /// front faces if prim isn't marked as doubleSided.
@@ -97,6 +104,10 @@ enum HdPointsGeomStyle {
 /// Defines geometric styles for how each polygon/triangle
 /// of a gprim is to be rendered.
 ///
+/// Unspecified indicates this gprim does not indicate how it should be drawn
+/// (ie, it will always be overriden by another opinion).
+/// The actual geomstyle must come from somewhere else, such as the viewer.
+///
 /// The polygons/triangles of a gprim can be drawn as Lines or Polygons.
 /// The HiddenLine, FeyRay, and Sheer styles are combinations
 /// of these styles:
@@ -112,6 +123,7 @@ enum HdPointsGeomStyle {
 ///
 enum HdGeomStyle
 {
+    HdGeomStyleUnspecified,
     HdGeomStyleLines,
     HdGeomStylePolygons,
     HdGeomStyleHiddenLine,
@@ -235,5 +247,57 @@ enum HdFormat
     HdFormatCount,
     HdFormatUnknown = -1
 };
+
+///
+/// \enum HdInterpolation
+///
+/// Enumerates Hydra's primVar interpolation modes.
+///
+/// Constant:    One value remains constant over the entire surface primitive.
+///
+/// Uniform:     One value remains constant for each uv patch segment of the
+///              surface primitive.
+///
+/// Varying:     Four values are interpolated over each uv patch segment of
+///              the surface. Bilinear interpolation is used for interpolation
+///              between the four values.
+///
+/// Vertex:      Values are interpolated between each vertex in the surface
+///              primitive. The basis function of the surface is used for
+///              interpolation between vertices.
+///
+/// Facevarying: For polygons and subdivision surfaces, four values are
+///              interpolated over each face of the mesh. Bilinear interpolation
+///              is used for interpolation between the four values.
+///
+enum HdInterpolation
+{
+    HdInterpolationConstant = 0,
+    HdInterpolationUniform,
+    HdInterpolationVarying,
+    HdInterpolationVertex,
+    HdInterpolationFaceVarying,
+
+    HdInterpolationCount
+};
+
+///
+/// \enum HdExtComputationInputType
+///
+/// Identifies the type of the source of an input to an ExtComputation.
+///
+/// Scene:       The input should be sourced from the Scene Delegate
+///
+/// Computation: The input should be sourced from another ExtComputation.
+///
+enum HdExtComputationInputType
+{
+    HdExtComputationInputTypeScene   = 0,
+    HdExtComputationInputTypeComputation,
+
+    HdExtComputationInputTypeCount
+};
+
+PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // HD_ENUMS_H

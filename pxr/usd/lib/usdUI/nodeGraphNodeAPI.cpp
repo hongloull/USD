@@ -28,6 +28,8 @@
 #include "pxr/usd/sdf/types.h"
 #include "pxr/usd/sdf/assetPath.h"
 
+PXR_NAMESPACE_OPEN_SCOPE
+
 // Register the schema with the TfType system.
 TF_REGISTRY_FUNCTION(TfType)
 {
@@ -45,7 +47,7 @@ UsdUINodeGraphNodeAPI::~UsdUINodeGraphNodeAPI()
 UsdUINodeGraphNodeAPI
 UsdUINodeGraphNodeAPI::Get(const UsdStagePtr &stage, const SdfPath &path)
 {
-    if (not stage) {
+    if (!stage) {
         TF_CODING_ERROR("Invalid stage");
         return UsdUINodeGraphNodeAPI();
     }
@@ -127,6 +129,57 @@ UsdUINodeGraphNodeAPI::CreateDisplayColorAttr(VtValue const &defaultValue, bool 
                        writeSparsely);
 }
 
+UsdAttribute
+UsdUINodeGraphNodeAPI::GetIconAttr() const
+{
+    return GetPrim().GetAttribute(UsdUITokens->uiNodegraphNodeIcon);
+}
+
+UsdAttribute
+UsdUINodeGraphNodeAPI::CreateIconAttr(VtValue const &defaultValue, bool writeSparsely) const
+{
+    return UsdSchemaBase::_CreateAttr(UsdUITokens->uiNodegraphNodeIcon,
+                       SdfValueTypeNames->Asset,
+                       /* custom = */ false,
+                       SdfVariabilityUniform,
+                       defaultValue,
+                       writeSparsely);
+}
+
+UsdAttribute
+UsdUINodeGraphNodeAPI::GetExpansionStateAttr() const
+{
+    return GetPrim().GetAttribute(UsdUITokens->uiNodegraphNodeExpansionState);
+}
+
+UsdAttribute
+UsdUINodeGraphNodeAPI::CreateExpansionStateAttr(VtValue const &defaultValue, bool writeSparsely) const
+{
+    return UsdSchemaBase::_CreateAttr(UsdUITokens->uiNodegraphNodeExpansionState,
+                       SdfValueTypeNames->Token,
+                       /* custom = */ false,
+                       SdfVariabilityUniform,
+                       defaultValue,
+                       writeSparsely);
+}
+
+UsdAttribute
+UsdUINodeGraphNodeAPI::GetSizeAttr() const
+{
+    return GetPrim().GetAttribute(UsdUITokens->uiNodegraphNodeSize);
+}
+
+UsdAttribute
+UsdUINodeGraphNodeAPI::CreateSizeAttr(VtValue const &defaultValue, bool writeSparsely) const
+{
+    return UsdSchemaBase::_CreateAttr(UsdUITokens->uiNodegraphNodeSize,
+                       SdfValueTypeNames->Float2,
+                       /* custom = */ false,
+                       SdfVariabilityUniform,
+                       defaultValue,
+                       writeSparsely);
+}
+
 namespace {
 static inline TfTokenVector
 _ConcatenateAttributeNames(const TfTokenVector& left,const TfTokenVector& right)
@@ -147,6 +200,9 @@ UsdUINodeGraphNodeAPI::GetSchemaAttributeNames(bool includeInherited)
         UsdUITokens->uiNodegraphNodePos,
         UsdUITokens->uiNodegraphNodeStackingOrder,
         UsdUITokens->uiNodegraphNodeDisplayColor,
+        UsdUITokens->uiNodegraphNodeIcon,
+        UsdUITokens->uiNodegraphNodeExpansionState,
+        UsdUITokens->uiNodegraphNodeSize,
     };
     static TfTokenVector allNames =
         _ConcatenateAttributeNames(
@@ -159,8 +215,13 @@ UsdUINodeGraphNodeAPI::GetSchemaAttributeNames(bool includeInherited)
         return localNames;
 }
 
+PXR_NAMESPACE_CLOSE_SCOPE
+
 // ===================================================================== //
 // Feel free to add custom code below this line. It will be preserved by
 // the code generator.
+//
+// Just remember to wrap code in the appropriate delimiters:
+// 'PXR_NAMESPACE_OPEN_SCOPE', 'PXR_NAMESPACE_CLOSE_SCOPE'.
 // ===================================================================== //
 // --(BEGIN CUSTOM CODE)--

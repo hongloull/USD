@@ -36,6 +36,9 @@
 
 #include "pxr/base/tf/type.h"
 
+PXR_NAMESPACE_OPEN_SCOPE
+
+
 TF_REGISTRY_FUNCTION(TfType)
 {
     typedef UsdImagingNurbsPatchAdapter Adapter;
@@ -45,6 +48,12 @@ TF_REGISTRY_FUNCTION(TfType)
 
 UsdImagingNurbsPatchAdapter::~UsdImagingNurbsPatchAdapter() 
 {
+}
+
+bool
+UsdImagingNurbsPatchAdapter::IsSupported(HdRenderIndex* renderIndex)
+{
+    return renderIndex->IsRprimTypeSupported(HdPrimTypeTokens->mesh);
 }
 
 SdfPath
@@ -63,7 +72,7 @@ UsdImagingNurbsPatchAdapter::Populate(UsdPrim const& prim,
 void 
 UsdImagingNurbsPatchAdapter::TrackVariabilityPrep(UsdPrim const& prim,
                                               SdfPath const& cachePath,
-                                              int requestedBits,
+                                              HdDirtyBits requestedBits,
                                               UsdImagingInstancerContext const* 
                                                   instancerContext)
 {
@@ -75,8 +84,8 @@ UsdImagingNurbsPatchAdapter::TrackVariabilityPrep(UsdPrim const& prim,
 void 
 UsdImagingNurbsPatchAdapter::TrackVariability(UsdPrim const& prim,
                                           SdfPath const& cachePath,
-                                          int requestedBits,
-                                          int* dirtyBits,
+                                          HdDirtyBits requestedBits,
+                                          HdDirtyBits* dirtyBits,
                                           UsdImagingInstancerContext const* 
                                               instancerContext)
 {
@@ -110,7 +119,7 @@ void
 UsdImagingNurbsPatchAdapter::UpdateForTimePrep(UsdPrim const& prim,
                                    SdfPath const& cachePath, 
                                    UsdTimeCode time,
-                                   int requestedBits,
+                                   HdDirtyBits requestedBits,
                                    UsdImagingInstancerContext const* 
                                        instancerContext)
 {
@@ -133,8 +142,8 @@ void
 UsdImagingNurbsPatchAdapter::UpdateForTime(UsdPrim const& prim,
                                SdfPath const& cachePath, 
                                UsdTimeCode time,
-                               int requestedBits,
-                               int* resultBits,
+                               HdDirtyBits requestedBits,
+                               HdDirtyBits* resultBits,
                                UsdImagingInstancerContext const* 
                                    instancerContext)
 {
@@ -166,7 +175,7 @@ UsdImagingNurbsPatchAdapter::GetMeshPoints(UsdPrim const& prim,
 {
     VtArray<GfVec3f> points;
 
-    if (not prim.GetAttribute(UsdGeomTokens->points).Get(&points, time)) {
+    if (!prim.GetAttribute(UsdGeomTokens->points).Get(&points, time)) {
         TF_WARN("Points could not be read from prim: <%s>",
                 prim.GetPath().GetText());
         points = VtVec3fArray();
@@ -186,13 +195,13 @@ UsdImagingNurbsPatchAdapter::GetMeshTopology(UsdPrim const& prim,
     // quads out of the patches
     int nUVertexCount = 0, nVVertexCount = 0;
     
-    if (not nurbsPatch.GetUVertexCountAttr().Get(&nUVertexCount, time)) {
+    if (!nurbsPatch.GetUVertexCountAttr().Get(&nUVertexCount, time)) {
         TF_WARN("UVertexCount could not be read from prim: <%s>",
                 prim.GetPath().GetText());
         return VtValue(HdMeshTopology());
     }
 
-    if (not nurbsPatch.GetVVertexCountAttr().Get(&nVVertexCount, time)) {
+    if (!nurbsPatch.GetVVertexCountAttr().Get(&nVVertexCount, time)) {
         TF_WARN("VVertexCount could not be read from prim: <%s>",
                 prim.GetPath().GetText());
         return VtValue(HdMeshTopology());
@@ -233,7 +242,7 @@ UsdImagingNurbsPatchAdapter::GetMeshTopology(UsdPrim const& prim,
 
     // Obtain the orientation
     TfToken orientation;
-    if (not prim.GetAttribute(UsdGeomTokens->orientation).Get(&orientation, time)) {
+    if (!prim.GetAttribute(UsdGeomTokens->orientation).Get(&orientation, time)) {
         TF_WARN("Orientation could not be read from prim, using right handed: <%s>",
                 prim.GetPath().GetText());
         orientation = HdTokens->rightHanded;
@@ -248,3 +257,6 @@ UsdImagingNurbsPatchAdapter::GetMeshTopology(UsdPrim const& prim,
 
     return VtValue(topo);
 }
+
+PXR_NAMESPACE_CLOSE_SCOPE
+

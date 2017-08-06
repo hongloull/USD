@@ -20,15 +20,8 @@
 // distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
-//
-// XXX: 
-// We need to include Python.h at the top of this file because one
-// of the headers below (likely tf/type.h) includes Python.h, but 
-// Python.h needs to come at the top of the file or else we run
-// into compilation errors. This should be removed when we fix
-// the Python include issues throughout the codebase.
-#include <Python.h>
 
+#include "pxr/pxr.h"
 #include "pxr/usd/ar/debugCodes.h"
 #include "pxr/usd/ar/defaultResolver.h"
 #include "pxr/usd/ar/defineResolver.h"
@@ -41,11 +34,12 @@
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/tf/type.h"
 
-#include <boost/foreach.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
+
+PXR_NAMESPACE_OPEN_SCOPE
 
 TF_REGISTRY_FUNCTION(TfType)
 {
@@ -72,7 +66,7 @@ _GetTypeNames(const std::set<TfType>& types)
 {
     std::vector<std::string> typeNames;
     typeNames.reserve(types.size());
-    BOOST_FOREACH(const TfType& type, types) {
+    for (const auto& type : types) {
         typeNames.push_back(type.GetTypeName());
     }
     return TfStringJoin(typeNames);
@@ -89,7 +83,7 @@ namespace
 struct _ResolverHolder
 {
     _ResolverHolder()
-        : resolver(new Ar_DefaultResolver)
+        : resolver(new ArDefaultResolver)
     {
         if (TfGetEnvSetting(PXR_AR_DISABLE_PLUGIN_RESOLVER)) {
             TF_DEBUG(AR_RESOLVER_INIT).Msg(
@@ -132,11 +126,11 @@ struct _ResolverHolder
 
         PlugPluginPtr plugin = PlugRegistry::GetInstance()
             .GetPluginForType(resolverType);
-        if (not TF_VERIFY(
+        if (!TF_VERIFY(
                 plugin, 
                 "Failed to find plugin for %s", 
                 resolverType.GetTypeName().c_str())
-            or not TF_VERIFY(
+            || !TF_VERIFY(
                 plugin->Load(), 
                 "Failed to load plugin %s for %s",
                 plugin->GetName().c_str(),
@@ -146,13 +140,13 @@ struct _ResolverHolder
 
         ArResolverFactoryBase* factory =
             resolverType.GetFactory<ArResolverFactoryBase>();
-        if (not factory) {
+        if (!factory) {
             TF_CODING_ERROR("Cannot manufacture plugin asset resolver");
             return;
         }
 
         ArResolver* tmpResolver = factory->New();
-        if (not tmpResolver) {
+        if (!tmpResolver) {
             TF_CODING_ERROR("Failed to manufacture plugin asset resolver");
             return;
         }
@@ -167,7 +161,7 @@ struct _ResolverHolder
 
     }
 
-    boost::shared_ptr<ArResolver> resolver;
+    std::shared_ptr<ArResolver> resolver;
 };
 } // end anonymous namespace
 
@@ -180,3 +174,5 @@ ArGetResolver()
     static _ResolverHolder holder;
     return *holder.resolver;
 }
+
+PXR_NAMESPACE_CLOSE_SCOPE

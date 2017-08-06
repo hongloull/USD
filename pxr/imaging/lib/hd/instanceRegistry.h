@@ -24,12 +24,19 @@
 #ifndef HD_INSTANCE_REGISTRY_H
 #define HD_INSTANCE_REGISTRY_H
 
-#include <mutex>
+#include "pxr/pxr.h"
+#include "pxr/imaging/hd/api.h"
+#include "pxr/imaging/hd/version.h"
+#include "pxr/imaging/hd/perfLog.h"
+#include "pxr/imaging/hf/perfLog.h"
+
 #include <boost/shared_ptr.hpp>
 #include <tbb/concurrent_unordered_map.h>
 
-#include "pxr/imaging/hd/version.h"
-#include "pxr/imaging/hd/perfLog.h"
+#include <mutex>
+
+PXR_NAMESPACE_OPEN_SCOPE
+
 
 /// \class HdInstance
 ///
@@ -119,6 +126,11 @@ public:
     std::unique_lock<std::mutex> GetInstance(typename INSTANCE::KeyType const &key,
                                              INSTANCE *instance);
 
+    /// Returns a shared instance for a given key as a pair of (key, value)
+    /// only if the key exists in the dictionary.
+    std::unique_lock<std::mutex> FindInstance(typename INSTANCE::KeyType const &key, 
+                                             INSTANCE *instance, bool *found);
+
     /// Remove entries which has unreferenced key and returns the count of
     /// remaining entries.
     size_t GarbageCollect();
@@ -128,6 +140,8 @@ public:
     typedef typename INSTANCE::Dictionary::const_iterator const_iterator;
     const_iterator begin() const { return _dictionary.begin(); }
     const_iterator end() const { return _dictionary.end(); }
+
+    void Invalidate();
 
 private:
     template <typename T>
@@ -151,7 +165,7 @@ HdInstanceRegistry<INSTANCE>::GetInstance(typename INSTANCE::KeyType const &key,
                                           INSTANCE *instance)
 {
     HD_TRACE_FUNCTION();
-    HD_MALLOC_TAG_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
 
     // Grab Registry lock
     // (and don't release it in this function, return it instead)
@@ -173,11 +187,34 @@ HdInstanceRegistry<INSTANCE>::GetInstance(typename INSTANCE::KeyType const &key,
 }
 
 template <typename INSTANCE>
+std::unique_lock<std::mutex>
+HdInstanceRegistry<INSTANCE>::FindInstance(typename INSTANCE::KeyType const &key, 
+                                          INSTANCE *instance, bool *found)
+{
+    HD_TRACE_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
+
+    // Grab Registry lock
+    // (and don't release it in this function, return it instead)
+    std::unique_lock<std::mutex> lock(_regLock);
+
+    typename _Dictionary::iterator it = _dictionary.find(key);
+    if (it == _dictionary.end()) {
+        *found = false;
+    } else {
+        *found = true;
+        instance->Create(key, it->second, &_dictionary, false /*firstInstance*/);
+    }
+
+    return lock;
+}
+
+template <typename INSTANCE>
 size_t
 HdInstanceRegistry<INSTANCE>::GarbageCollect()
 {
     HD_TRACE_FUNCTION();
-    HD_MALLOC_TAG_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
 
     size_t count = 0;
     for (typename _Dictionary::iterator it = _dictionary.begin();
@@ -193,5 +230,18 @@ HdInstanceRegistry<INSTANCE>::GarbageCollect()
     }
     return count;
 }
+
+template <typename INSTANCE>
+void
+HdInstanceRegistry<INSTANCE>::Invalidate()
+{
+    HD_TRACE_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
+
+    _dictionary.clear();
+}
+
+
+PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif  // HD_INSTANCE_REGISTRY_H

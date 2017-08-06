@@ -39,6 +39,9 @@
 
 #include <cmath>
 
+PXR_NAMESPACE_OPEN_SCOPE
+
+
 TF_REGISTRY_FUNCTION(TfType)
 {
     typedef UsdImagingCapsuleAdapter Adapter;
@@ -48,6 +51,12 @@ TF_REGISTRY_FUNCTION(TfType)
 
 UsdImagingCapsuleAdapter::~UsdImagingCapsuleAdapter() 
 {
+}
+
+bool
+UsdImagingCapsuleAdapter::IsSupported(HdRenderIndex* renderIndex)
+{
+    return renderIndex->IsRprimTypeSupported(HdPrimTypeTokens->mesh);
 }
 
 SdfPath
@@ -67,7 +76,7 @@ UsdImagingCapsuleAdapter::Populate(UsdPrim const& prim,
 void 
 UsdImagingCapsuleAdapter::TrackVariabilityPrep(UsdPrim const& prim,
                                               SdfPath const& cachePath,
-                                              int requestedBits,
+                                              HdDirtyBits requestedBits,
                                               UsdImagingInstancerContext const* 
                                                   instancerContext)
 {
@@ -79,8 +88,8 @@ UsdImagingCapsuleAdapter::TrackVariabilityPrep(UsdPrim const& prim,
 void 
 UsdImagingCapsuleAdapter::TrackVariability(UsdPrim const& prim,
                                           SdfPath const& cachePath,
-                                          int requestedBits,
-                                          int* dirtyBits,
+                                          HdDirtyBits requestedBits,
+                                          HdDirtyBits* dirtyBits,
                                           UsdImagingInstancerContext const* 
                                               instancerContext)
 {
@@ -91,7 +100,7 @@ UsdImagingCapsuleAdapter::TrackVariability(UsdPrim const& prim,
     // container during update.
 
     if (requestedBits & HdChangeTracker::DirtyPoints) {
-        if (not _IsVarying(prim, 
+        if (!_IsVarying(prim, 
                            UsdGeomTokens->radius,
                            HdChangeTracker::DirtyPoints,
                            UsdImagingTokens->usdVaryingPrimVar,
@@ -111,7 +120,7 @@ void
 UsdImagingCapsuleAdapter::UpdateForTimePrep(UsdPrim const& prim,
                                    SdfPath const& cachePath, 
                                    UsdTimeCode time,
-                                   int requestedBits,
+                                   HdDirtyBits requestedBits,
                                    UsdImagingInstancerContext const* 
                                        instancerContext)
 {
@@ -134,8 +143,8 @@ void
 UsdImagingCapsuleAdapter::UpdateForTime(UsdPrim const& prim,
                                SdfPath const& cachePath, 
                                UsdTimeCode time,
-                               int requestedBits,
-                               int* resultBits,
+                               HdDirtyBits requestedBits,
+                               HdDirtyBits* resultBits,
                                UsdImagingInstancerContext const* 
                                    instancerContext)
 {
@@ -312,7 +321,7 @@ _GenerateCapsuleMeshTopology()
         indices[index++] = top;
     }
 
-    TF_VERIFY(face == numCounts and index == numIndices);
+    TF_VERIFY(face == numCounts && index == numIndices);
 
     return HdMeshTopology(PxOsdOpenSubdivTokens->catmark,
                           HdTokens->rightHanded,
@@ -328,3 +337,6 @@ UsdImagingCapsuleAdapter::GetMeshTopology()
 
     return VtValue(capsuleTopo);
 }
+
+PXR_NAMESPACE_CLOSE_SCOPE
+

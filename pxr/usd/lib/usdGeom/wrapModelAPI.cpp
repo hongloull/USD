@@ -21,17 +21,18 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
+#include "pxr/pxr.h"
 #include "pxr/usd/usdGeom/modelAPI.h"
 #include "pxr/usd/usdGeom/constraintTarget.h"
 
 #include "pxr/usd/usd/schemaBase.h"
-#include "pxr/usd/usd/conversions.h"
 
 #include "pxr/usd/sdf/primSpec.h"
 #include "pxr/usd/sdf/types.h"
 
 #include "pxr/base/vt/value.h"
 
+#include "pxr/usd/usd/pyConversions.h"
 #include "pxr/base/tf/pyContainerConversions.h"
 #include "pxr/base/tf/pyResultConversions.h"
 #include "pxr/base/tf/pyUtils.h"
@@ -41,11 +42,17 @@
 
 using namespace boost::python;
 
+PXR_NAMESPACE_USING_DIRECTIVE
+
+namespace {
+
 #define WRAP_CUSTOM                                                     \
     template <class Cls> static void _CustomWrapCode(Cls &_class)
 
 // fwd decl.
 WRAP_CUSTOM;
+
+} // anonymous namespace 
 
 void wrapUsdGeomModelAPI()
 {
@@ -83,8 +90,14 @@ void wrapUsdGeomModelAPI()
 // }
 //
 // Of course any other ancillary or support code may be provided.
+// 
+// Just remember to wrap code in the appropriate delimiters:
+// 'namespace {', '}'.
+//
 // ===================================================================== //
 // --(BEGIN CUSTOM CODE)--
+
+namespace {
 
 static object
 _GetExtentsHint(
@@ -92,7 +105,7 @@ _GetExtentsHint(
         const UsdTimeCode &time)
 {
     VtVec3fArray extents;
-    if (not self.GetExtentsHint(&extents, time)) {
+    if (!self.GetExtentsHint(&extents, time)) {
         return object();
     }
 
@@ -106,7 +119,7 @@ _SetExtentsHint(
         const UsdTimeCode &timeVal)
 {
     VtValue value = UsdPythonToSdfType(pyVal, SdfValueTypeNames->Float3Array);
-    if (not value.IsHolding<VtVec3fArray>()) {
+    if (!value.IsHolding<VtVec3fArray>()) {
         TF_CODING_ERROR("Improper value for 'extentsHint' on %s",
                         UsdDescribe(self.GetPrim()).c_str());
         return false;
@@ -133,3 +146,5 @@ WRAP_CUSTOM {
             return_value_policy<TfPySequenceToList>())
     ;
 }
+
+} // anonymous namespace 

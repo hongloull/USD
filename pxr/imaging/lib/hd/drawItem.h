@@ -24,10 +24,14 @@
 #ifndef HD_DRAW_ITEM_H
 #define HD_DRAW_ITEM_H
 
+#include "pxr/pxr.h"
+#include "pxr/imaging/hd/api.h"
 #include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/drawingCoord.h"
 #include "pxr/imaging/hd/rprimSharedData.h"
+
+#include "pxr/imaging/hf/perfLog.h"
 
 #include "pxr/imaging/garch/gl.h"
 #include "pxr/base/gf/matrix4d.h"
@@ -39,23 +43,29 @@
 
 #include <iosfwd>
 
+PXR_NAMESPACE_OPEN_SCOPE
+
+
 typedef boost::shared_ptr<class Hd_GeometricShader> Hd_GeometricShaderSharedPtr;
-typedef boost::shared_ptr<class HdShader> HdShaderSharedPtr;
+typedef boost::shared_ptr<class HdShaderCode> HdShaderCodeSharedPtr;
 
 /// \class HdDrawItem
 ///
-/// An abstraction for a single OpenGL draw call.
+/// An abstraction for a single draw item.
 ///
 class HdDrawItem {
 public:
 
-    HD_MALLOC_TAG_NEW("new HdDrawItem");
+    HF_MALLOC_TAG_NEW("new HdDrawItem");
 
+    HD_API
     HdDrawItem(HdRprimSharedData const *sharedData);
+    HD_API
     ~HdDrawItem();
 
     SdfPath const &GetRprimID() const { return _sharedData->rprimID; }
 
+    HD_API
     GLenum GetPrimitiveMode() const;
 
     void SetGeometricShader(Hd_GeometricShaderSharedPtr const &geometricShader) {
@@ -66,7 +76,8 @@ public:
         return _geometricShader;
     }
 
-    HdShaderSharedPtr GetSurfaceShader() const;
+    HD_API
+    HdShaderCodeSharedPtr GetSurfaceShader() const;
 
     GfBBox3d const & GetBounds() const { return _sharedData->bounds; }
 
@@ -150,14 +161,17 @@ public:
     /// so any drawing coord caching buffer (e.g. indirect dispatch buffer)
     /// has to be rebuilt at the moment.
     /// Note that this value is a hash, not sequential.
+    HD_API
     size_t GetBufferArraysHash() const;
 
     /// Tests the intersection with the view projection matrix.
     /// Returns true if this drawItem is in the frustum.
     ///
     /// XXX: Currently if this drawitem uses HW instancing, always returns true.
+    HD_API
     bool IntersectsViewVolume(GfMatrix4d const &viewProjMatrix) const;
 
+    HD_API
     friend std::ostream &operator <<(std::ostream &out, 
                                      const HdDrawItem& self);
 
@@ -172,5 +186,8 @@ private:
     //    bufferArrayRanges, bounds, visibility
     HdRprimSharedData const *_sharedData;
 };
+
+
+PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif //HD_DRAW_ITEM_H

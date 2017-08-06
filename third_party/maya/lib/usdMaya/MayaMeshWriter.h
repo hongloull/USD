@@ -24,25 +24,31 @@
 #ifndef PXRUSDMAYA_MAYAMESHWRITER_H
 #define PXRUSDMAYA_MAYAMESHWRITER_H
 
+#include "pxr/pxr.h"
 #include "usdMaya/MayaTransformWriter.h"
 
+#include <maya/MDagPath.h>
 #include <maya/MFnMesh.h>
+#include <maya/MString.h>
+
+PXR_NAMESPACE_OPEN_SCOPE
+
 
 class UsdGeomMesh;
 class UsdGeomGprim;
-class MString;
 
 
 // Writes an MFnMesh as a poly mesh OR a subd mesh
 class MayaMeshWriter : public MayaTransformWriter
 {
   public:
-    MayaMeshWriter(MDagPath & iDag, 
-            UsdStageRefPtr stage, 
-            const JobExportArgs & iArgs);
+    MayaMeshWriter(const MDagPath & iDag,
+                   const SdfPath& uPath,
+                   bool instanceSource,
+                   usdWriteJobCtx& jobCtx);
     virtual ~MayaMeshWriter() {};
 
-    virtual UsdPrim write(const UsdTimeCode &usdTime);
+    virtual void write(const UsdTimeCode &usdTime);
     
     /// \override
     virtual bool exportsGprims() const;
@@ -53,13 +59,17 @@ class MayaMeshWriter : public MayaTransformWriter
   private:
     bool isMeshValid();
     void assignSubDivTagsToUSDPrim( MFnMesh &meshFn, UsdGeomMesh &primSchema);
-    MStatus _GetMeshUVSetData( MFnMesh& m,  MString uvSetName,
-               VtArray<GfVec2f> *uvArray,
-               TfToken *interpolation);
+
+    bool _GetMeshUVSetData(
+        const MFnMesh& mesh,
+        const MString& uvSetName,
+        VtArray<GfVec2f>* uvArray,
+        TfToken* interpolation,
+        VtArray<int>* assignmentIndices);
 
     bool _GetMeshColorSetData(
         MFnMesh& mesh,
-        MString colorSet,
+        const MString& colorSet,
         bool isDisplayColor,
         const VtArray<GfVec3f>& shadersRGBData,
         const VtArray<float>& shadersAlphaData,
@@ -70,19 +80,6 @@ class MayaMeshWriter : public MayaTransformWriter
         VtArray<int>* colorSetAssignmentIndices,
         MFnMesh::MColorRepresentation* colorSetRep,
         bool* clamped);
-
-    static MStatus
-    _CompressUVs(const MFnMesh& m,
-                 const MIntArray& uvIds,
-                 const MFloatArray& uArray, const MFloatArray& vArray,
-                 VtArray<GfVec2f> *uvArray,
-                 TfToken *interpolation);
-
-    static MStatus
-    _FullUVsFromSparse(const MFnMesh& m,
-                       const MIntArray& uvCounts, const MIntArray& uvIds,
-                       const MFloatArray& uArray, const MFloatArray& vArray,
-                       VtArray<GfVec2f> *uvArray);
 
     bool _createAlphaPrimVar(UsdGeomGprim &primSchema,
                              const TfToken& name,
@@ -109,6 +106,13 @@ class MayaMeshWriter : public MayaTransformWriter
                             const int unassignedValueIndex,
                             bool clamped);
 
+    bool _createUVPrimVar(UsdGeomGprim &primSchema,
+                          const TfToken& name,
+                          const VtArray<GfVec2f>& data,
+                          const TfToken& interpolation,
+                          const VtArray<int>& assignmentIndices,
+                          const int unassignedValueIndex);
+
     /// Adds displayColor and displayOpacity primvars using the given color,
     /// alpha, and assignment data if the \p primSchema does not already have
     /// authored opinions for them.
@@ -123,6 +127,10 @@ class MayaMeshWriter : public MayaTransformWriter
         const bool clamped,
         const bool authored);
 
+    /// Default value to use when collecting UVs from a UV set and a component
+    /// has no authored value.
+    static const GfVec2f _DefaultUV;
+
     /// Default values to use when collecting colors based on shader values
     /// and an object or component has no assigned shader.
     static const GfVec3f _ShaderDefaultRGB;
@@ -134,6 +142,9 @@ class MayaMeshWriter : public MayaTransformWriter
     static const float _ColorSetDefaultAlpha;
 };
 
-typedef shared_ptr < MayaMeshWriter > MayaMeshWriterPtr;
+typedef std::shared_ptr<MayaMeshWriter> MayaMeshWriterPtr;
+
+
+PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif  // PXRUSDMAYA_MAYAMESHWRITER_H

@@ -33,6 +33,9 @@
 
 #include "pxr/base/tf/type.h"
 
+PXR_NAMESPACE_OPEN_SCOPE
+
+
 TF_REGISTRY_FUNCTION(TfType)
 {
     typedef UsdImagingPointsAdapter Adapter;
@@ -42,6 +45,12 @@ TF_REGISTRY_FUNCTION(TfType)
 
 UsdImagingPointsAdapter::~UsdImagingPointsAdapter() 
 {
+}
+
+bool
+UsdImagingPointsAdapter::IsSupported(HdRenderIndex* renderIndex)
+{
+    return renderIndex->IsRprimTypeSupported(HdPrimTypeTokens->points);
 }
 
 SdfPath
@@ -60,7 +69,7 @@ UsdImagingPointsAdapter::Populate(UsdPrim const& prim,
 void 
 UsdImagingPointsAdapter::TrackVariabilityPrep(UsdPrim const& prim,
                                               SdfPath const& cachePath,
-                                              int requestedBits,
+                                              HdDirtyBits requestedBits,
                                               UsdImagingInstancerContext const* 
                                                   instancerContext)
 {
@@ -72,8 +81,8 @@ UsdImagingPointsAdapter::TrackVariabilityPrep(UsdPrim const& prim,
 void 
 UsdImagingPointsAdapter::TrackVariability(UsdPrim const& prim,
                                           SdfPath const& cachePath,
-                                          int requestedBits,
-                                          int* dirtyBits,
+                                          HdDirtyBits requestedBits,
+                                          HdDirtyBits* dirtyBits,
                                           UsdImagingInstancerContext const* 
                                               instancerContext)
 {
@@ -102,7 +111,7 @@ void
 UsdImagingPointsAdapter::UpdateForTimePrep(UsdPrim const& prim,
                                            SdfPath const& cachePath, 
                                            UsdTimeCode time,
-                                           int requestedBits,
+                                           HdDirtyBits requestedBits,
                                            UsdImagingInstancerContext const* 
                                                instancerContext)
 {
@@ -121,8 +130,8 @@ void
 UsdImagingPointsAdapter::UpdateForTime(UsdPrim const& prim,
                                        SdfPath const& cachePath, 
                                        UsdTimeCode time,
-                                       int requestedBits,
-                                       int* resultBits,
+                                       HdDirtyBits requestedBits,
+                                       HdDirtyBits* resultBits,
                                        UsdImagingInstancerContext const* 
                                            instancerContext)
 {
@@ -179,7 +188,10 @@ UsdImagingPointsAdapter::_GetPoints(UsdPrim const& prim,
                                    UsdTimeCode time)
 {
     HD_TRACE_FUNCTION();
-    if (not prim.GetAttribute(UsdGeomTokens->points).Get(value, time)) {
+    if (!prim.GetAttribute(UsdGeomTokens->points).Get(value, time)) {
         *value = VtVec3fArray();
     }
 }
+
+PXR_NAMESPACE_CLOSE_SCOPE
+

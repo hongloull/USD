@@ -35,6 +35,9 @@
 
 #include "pxr/base/tf/type.h"
 
+PXR_NAMESPACE_OPEN_SCOPE
+
+
 TF_REGISTRY_FUNCTION(TfType)
 {
     typedef UsdImagingBasisCurvesAdapter Adapter;
@@ -44,6 +47,12 @@ TF_REGISTRY_FUNCTION(TfType)
 
 UsdImagingBasisCurvesAdapter::~UsdImagingBasisCurvesAdapter() 
 {
+}
+
+bool
+UsdImagingBasisCurvesAdapter::IsSupported(HdRenderIndex* renderIndex)
+{
+    return renderIndex->IsRprimTypeSupported(HdPrimTypeTokens->basisCurves);
 }
 
 SdfPath
@@ -62,7 +71,7 @@ UsdImagingBasisCurvesAdapter::Populate(UsdPrim const& prim,
 void 
 UsdImagingBasisCurvesAdapter::TrackVariabilityPrep(UsdPrim const& prim,
                                              SdfPath const& cachePath,
-                                             int requestedBits,
+                                             HdDirtyBits requestedBits,
                                              UsdImagingInstancerContext const* 
                                                  instancerContext)
 {
@@ -74,8 +83,8 @@ UsdImagingBasisCurvesAdapter::TrackVariabilityPrep(UsdPrim const& prim,
 void 
 UsdImagingBasisCurvesAdapter::TrackVariability(UsdPrim const& prim,
                                                SdfPath const& cachePath,
-                                               int requestedBits,
-                                               int* dirtyBits,
+                                               HdDirtyBits requestedBits,
+                                               HdDirtyBits* dirtyBits,
                                                UsdImagingInstancerContext const* 
                                                    instancerContext)
 {
@@ -122,7 +131,7 @@ void
 UsdImagingBasisCurvesAdapter::UpdateForTimePrep(UsdPrim const& prim,
                                    SdfPath const& cachePath, 
                                    UsdTimeCode time,
-                                   int requestedBits,
+                                   HdDirtyBits requestedBits,
                                    UsdImagingInstancerContext const* 
                                        instancerContext)
 {
@@ -147,8 +156,8 @@ void
 UsdImagingBasisCurvesAdapter::UpdateForTime(UsdPrim const& prim,
                                SdfPath const& cachePath, 
                                UsdTimeCode time,
-                               int requestedBits,
-                               int* resultBits,
+                               HdDirtyBits requestedBits,
+                               HdDirtyBits* resultBits,
                                UsdImagingInstancerContext const* 
                                    instancerContext)
 {
@@ -210,7 +219,7 @@ UsdImagingBasisCurvesAdapter::_GetBasisCurvesTopology(UsdPrim const& prim,
                                          UsdTimeCode time)
 {
     HD_TRACE_FUNCTION();
-    HD_MALLOC_TAG_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
 
     // These are uniform attributes and can't vary over time.
     UsdTimeCode unvarying = UsdTimeCode::Default();
@@ -265,9 +274,12 @@ UsdImagingBasisCurvesAdapter::_GetPoints(UsdPrim const& prim,
                                    UsdTimeCode time)
 {
     HD_TRACE_FUNCTION();
-    if (not prim.GetAttribute(UsdGeomTokens->points).Get(value, time)) {
+    if (!prim.GetAttribute(UsdGeomTokens->points).Get(value, time)) {
         TF_WARN("Points could not be read from prim: <%s>",
                 prim.GetPath().GetText());
         *value = VtVec3fArray();
     }
 }
+
+PXR_NAMESPACE_CLOSE_SCOPE
+

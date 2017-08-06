@@ -22,8 +22,9 @@
 // language governing permissions and limitations under the Apache License.
 //
 // Types.cpp
-#include "pxr/usd/sdf/types.h"
 
+#include "pxr/pxr.h"
+#include "pxr/usd/sdf/types.h"
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/sdf/schema.h"
 #include "pxr/usd/sdf/valueTypeName.h"
@@ -37,12 +38,13 @@
 #include "pxr/base/tf/registryManager.h"
 #include "pxr/base/tf/staticData.h"
 #include "pxr/base/tf/type.h"
-#include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 
 using std::map;
 using std::string;
 using std::vector;
+
+PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_ENV_SETTING(SDF_WRITE_OLD_TYPENAMES, false,
                       "Write values using old type-name alias");
@@ -139,7 +141,7 @@ static void _AddToUnitsMaps(const TfEnum &unit,
                             double scale,
                             const string &category)
 {
-    if (not _UnitsMap) {
+    if (!_UnitsMap) {
         _UnitsMap = new map<string, map<int, double> *>;
         _DefaultUnitsMap = new map<string, TfEnum>;
         _UnitCategoryToDefaultUnitMap = new map<string, TfEnum>;
@@ -156,7 +158,7 @@ static void _AddToUnitsMaps(const TfEnum &unit,
     const char *enumTypeName = unit.GetType().name();
     map<int, double> *scalesMap = (*_UnitsMap)[enumTypeName];
 
-    if (not scalesMap) {
+    if (!scalesMap) {
         scalesMap = (*_UnitsMap)[enumTypeName] = new map<int, double>;
     }
     (*scalesMap)[unit.GetValueAsInt()] = scale;
@@ -203,13 +205,13 @@ BOOST_PP_LIST_FOR_EACH(_REGISTRY_FUNCTION, ~, _SDF_UNITS)
 #undef _PROCESS_ENUMERANT
 
 #define _REGISTRY_FUNCTION(r, unused, elem)                          \
-TF_REGISTRY_FUNCTION_WITH_TAG(TfType, _SDF_UNITSLIST_CATEGORY(elem)) \
+TF_REGISTRY_FUNCTION_WITH_TAG(TfType, BOOST_PP_CAT(Type, _SDF_UNITSLIST_CATEGORY(elem))) \
 {                                                                    \
     TfType::Define<_SDF_UNITSLIST_ENUM(elem)>();                     \
 }                                                                    \
-TF_REGISTRY_FUNCTION_WITH_TAG(VtValue, _SDF_UNITSLIST_CATEGORY(elem))   \
-{                                                                       \
-    _RegisterEnumWithVtValue<_SDF_UNITSLIST_ENUM(elem)>();              \
+TF_REGISTRY_FUNCTION_WITH_TAG(VtValue, BOOST_PP_CAT(Value, _SDF_UNITSLIST_CATEGORY(elem))) \
+{                                                                    \
+    _RegisterEnumWithVtValue<_SDF_UNITSLIST_ENUM(elem)>();           \
 }
 BOOST_PP_LIST_FOR_EACH(_REGISTRY_FUNCTION, ~, _SDF_UNITS)
 #undef _REGISTRY_FUNCTION
@@ -225,7 +227,7 @@ SdfDefaultUnit( const TfEnum &unit )
 {
     static TfEnum empty;
 
-    if (not _DefaultUnitsMap) {
+    if (!_DefaultUnitsMap) {
         // CODE_COVERAGE_OFF
         // This can only happen if someone calls this function from a
         // registry function, and that does not happen.
@@ -249,7 +251,7 @@ SdfUnitCategory( const TfEnum &unit )
 {
     static string empty;
 
-    if (not _UnitTypeNameToUnitCategoryMap) {
+    if (!_UnitTypeNameToUnitCategoryMap) {
         // CODE_COVERAGE_OFF
         // This can only happen if someone calls this function from a
         // registry function, and that does not happen.
@@ -277,7 +279,7 @@ Sdf_GetUnitIndices( const TfEnum &unit )
 
 double SdfConvertUnit( const TfEnum &fromUnit, const TfEnum &toUnit )
 {
-    if (not _UnitsMap) {
+    if (!_UnitsMap) {
         // CODE_COVERAGE_OFF
         // This can only happen if someone calls this function from a
         // registry function, and that does not happen.
@@ -285,7 +287,7 @@ double SdfConvertUnit( const TfEnum &fromUnit, const TfEnum &toUnit )
         return 0.0;
         // CODE_COVERAGE_ON
     }
-    if ( not toUnit.IsA(fromUnit.GetType()) ) {
+    if (!toUnit.IsA(fromUnit.GetType()) ) {
         TF_WARN("Can not convert from '%s' to '%s'.",
                 TfEnum::GetFullName(fromUnit).c_str(),
                 TfEnum::GetFullName(toUnit).c_str());
@@ -308,8 +310,8 @@ SdfGetNameForUnit( const TfEnum &unit )
 {
     static std::string empty;
 
-    if (not _UnitTypeIndicesTable or
-        not _UnitNameTable) {
+    if (!_UnitTypeIndicesTable ||
+        !_UnitNameTable) {
         // CODE_COVERAGE_OFF
         // This can only happen if someone calls this function from a
         // registry function, and that does not happen.
@@ -338,7 +340,7 @@ SdfGetUnitFromName( const std::string &name )
 {
     static TfEnum empty;
 
-    if (not _UnitNameToUnitMap) {
+    if (!_UnitNameToUnitMap) {
         // CODE_COVERAGE_OFF
         // This can only happen if someone calls this function from a
         // registry function, and that does not happen.
@@ -362,18 +364,21 @@ bool SdfBoolFromString( const std::string &str, bool *parseOk )
     if (parseOk)
         *parseOk = true;
 
-    const char* s = str.c_str();
-    if (strcasecmp(s, "false") == 0)
+    std::string s = str;
+    std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+
+    if (strcmp(s.c_str(), "false") == 0)
         return false;
-    if (strcasecmp(s, "true") == 0)
+    if (strcmp(s.c_str(), "true") == 0)
         return true;
-    if (strcasecmp(s, "no") == 0)
+    if (strcmp(s.c_str(), "no") == 0)
         return false;
-    if (strcasecmp(s, "yes") == 0)
+    if (strcmp(s.c_str(), "yes") == 0)
         return true;
-    if (strcmp(s, "0") == 0)
+
+    if (strcmp(s.c_str(), "0") == 0)
         return false;
-    if (strcmp(s, "1") == 0)
+    if (strcmp(s.c_str(), "1") == 0)
         return true;
 
     if (parseOk)
@@ -489,14 +494,14 @@ Sdf_ValueTypeNamesType::GetSerializationName(
     if (TfGetEnvSetting(SDF_WRITE_OLD_TYPENAMES)) {
         // Return the last registered alias, which is the old type name.
         const TfToken name = typeName.GetAliasesAsTokens().back();
-        if (not name.IsEmpty()) {
+        if (!name.IsEmpty()) {
             return name;
         }
     }
     if (TfGetEnvSetting(SDF_CONVERT_TO_NEW_TYPENAMES)) {
         // Return the first registered alias, which is the new type name.
         const TfToken name = typeName.GetAliasesAsTokens().front();
-        if (not name.IsEmpty()) {
+        if (!name.IsEmpty()) {
             return name;
         }
     }
@@ -525,3 +530,5 @@ operator<<(std::ostream& ostr, SdfValueBlock const& block)
 { 
     return ostr << "None"; 
 }
+
+PXR_NAMESPACE_CLOSE_SCOPE

@@ -24,6 +24,10 @@
 #ifndef AR_DEFAULT_RESOLVER_H
 #define AR_DEFAULT_RESOLVER_H
 
+/// \file ar/defaultResolver.h
+
+#include "pxr/pxr.h"
+#include "pxr/usd/ar/api.h"
 #include "pxr/usd/ar/resolver.h"
 
 #include <tbb/enumerable_thread_specific.h>
@@ -32,7 +36,9 @@
 #include <string>
 #include <vector>
 
-/// \class Ar_DefaultResolver
+PXR_NAMESPACE_OPEN_SCOPE
+
+/// \class ArDefaultResolver
 ///
 /// Default asset resolution implementation used when no plugin
 /// implementation is provided.
@@ -45,80 +51,88 @@
 /// The first directory searched is always the current working directory.
 /// Consumers can specify additional directories by setting the 
 /// PXR_AR_DEFAULT_SEARCH_PATH environment variable to a list of
-/// directories delimited by ':'.
+/// directories delimited by the platform's standard path separator.
 ///
-class Ar_DefaultResolver
+class ArDefaultResolver
     : public ArResolver
 {
 public:
-    Ar_DefaultResolver();
-    virtual ~Ar_DefaultResolver();
+    ArDefaultResolver();
+    virtual ~ArDefaultResolver();
 
     // ArResolver overrides
-    virtual void ConfigureResolverForAsset(const std::string& path);
+    virtual void ConfigureResolverForAsset(const std::string& path) override;
 
     virtual std::string AnchorRelativePath(
         const std::string& anchorPath, 
-        const std::string& path); 
+        const std::string& path) override; 
 
-    virtual bool IsRelativePath(const std::string& path);
-    virtual bool IsRepositoryPath(const std::string& path);
-    virtual bool IsSearchPath(const std::string& path);
+    virtual bool IsRelativePath(const std::string& path) override;
+    virtual bool IsRepositoryPath(const std::string& path) override;
+    virtual bool IsSearchPath(const std::string& path) override;
 
-    virtual std::string GetExtension(const std::string& path);
+    virtual std::string GetExtension(const std::string& path) override;
 
-    virtual std::string ComputeNormalizedPath(const std::string& path);
+    virtual std::string ComputeNormalizedPath(const std::string& path) override;
 
-    virtual std::string ComputeRepositoryPath(const std::string& path);
+    virtual std::string ComputeRepositoryPath(const std::string& path) override;
 
-    virtual std::string ComputeLocalPath(const std::string& path);
+    virtual std::string ComputeLocalPath(const std::string& path) override;
 
-    virtual std::string Resolve(const std::string& path);
+    virtual std::string Resolve(const std::string& path) override;
 
     virtual std::string ResolveWithAssetInfo(
         const std::string& path, 
-        ArAssetInfo* assetInfo);
+        ArAssetInfo* assetInfo) override;
 
     virtual void UpdateAssetInfo(
        const std::string& identifier,
        const std::string& filePath,
        const std::string& fileVersion,
-       ArAssetInfo* assetInfo);
+       ArAssetInfo* assetInfo) override;
+
+    virtual VtValue GetModificationTimestamp(
+        const std::string& path,
+        const std::string& resolvedPath) override;
+
+    virtual bool FetchToLocalResolvedPath(
+        const std::string& path,
+        const std::string& resolvedPath) override;
 
     virtual bool CanWriteLayerToPath(
         const std::string& path,
-        std::string* whyNot);
+        std::string* whyNot) override;
 
     virtual bool CanCreateNewLayerWithIdentifier(
         const std::string& identifier, 
-        std::string* whyNot);
+        std::string* whyNot) override;
 
-    virtual ArResolverContext CreateDefaultContext();
+    virtual ArResolverContext CreateDefaultContext() override;
 
     virtual ArResolverContext CreateDefaultContextForAsset(
-        const std::string& filePath);
+        const std::string& filePath) override;
 
     virtual ArResolverContext CreateDefaultContextForDirectory(
-        const std::string& fileDirectory);
+        const std::string& fileDirectory) override;
 
-    virtual void RefreshContext(const ArResolverContext& context);
+    virtual void RefreshContext(const ArResolverContext& context) override;
 
-    virtual ArResolverContext GetCurrentContext();
+    virtual ArResolverContext GetCurrentContext() override;
 
 protected:
     virtual void _BeginCacheScope(
-        VtValue* cacheScopeData);
+        VtValue* cacheScopeData) override;
 
     virtual void _EndCacheScope(
-        VtValue* cacheScopeData);
+        VtValue* cacheScopeData) override;
 
     virtual void _BindContext(
         const ArResolverContext& context,
-        VtValue* bindingData);
+        VtValue* bindingData) override;
 
     virtual void _UnbindContext(
         const ArResolverContext& context,
-        VtValue* bindingData);
+        VtValue* bindingData) override;
 
 private:
     struct _Cache;
@@ -136,5 +150,7 @@ private:
 
     _PerThreadCachePtrStack _threadCacheStack;
 };
+
+PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // AR_DEFAULT_RESOLVER_H

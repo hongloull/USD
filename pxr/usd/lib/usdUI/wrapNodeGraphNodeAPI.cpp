@@ -22,12 +22,11 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/usd/usdUI/nodeGraphNodeAPI.h"
-
 #include "pxr/usd/usd/schemaBase.h"
-#include "pxr/usd/usd/conversions.h"
 
 #include "pxr/usd/sdf/primSpec.h"
 
+#include "pxr/usd/usd/pyConversions.h"
 #include "pxr/base/tf/pyContainerConversions.h"
 #include "pxr/base/tf/pyResultConversions.h"
 #include "pxr/base/tf/pyUtils.h"
@@ -38,6 +37,10 @@
 #include <string>
 
 using namespace boost::python;
+
+PXR_NAMESPACE_USING_DIRECTIVE
+
+namespace {
 
 #define WRAP_CUSTOM                                                     \
     template <class Cls> static void _CustomWrapCode(Cls &_class)
@@ -66,6 +69,29 @@ _CreateDisplayColorAttr(UsdUINodeGraphNodeAPI &self,
     return self.CreateDisplayColorAttr(
         UsdPythonToSdfType(defaultVal, SdfValueTypeNames->Color3f), writeSparsely);
 }
+        
+static UsdAttribute
+_CreateIconAttr(UsdUINodeGraphNodeAPI &self,
+                                      object defaultVal, bool writeSparsely) {
+    return self.CreateIconAttr(
+        UsdPythonToSdfType(defaultVal, SdfValueTypeNames->Asset), writeSparsely);
+}
+        
+static UsdAttribute
+_CreateExpansionStateAttr(UsdUINodeGraphNodeAPI &self,
+                                      object defaultVal, bool writeSparsely) {
+    return self.CreateExpansionStateAttr(
+        UsdPythonToSdfType(defaultVal, SdfValueTypeNames->Token), writeSparsely);
+}
+        
+static UsdAttribute
+_CreateSizeAttr(UsdUINodeGraphNodeAPI &self,
+                                      object defaultVal, bool writeSparsely) {
+    return self.CreateSizeAttr(
+        UsdPythonToSdfType(defaultVal, SdfValueTypeNames->Float2), writeSparsely);
+}
+
+} // anonymous namespace
 
 void wrapUsdUINodeGraphNodeAPI()
 {
@@ -116,6 +142,27 @@ void wrapUsdUINodeGraphNodeAPI()
              &_CreateDisplayColorAttr,
              (arg("defaultValue")=object(),
               arg("writeSparsely")=false))
+        
+        .def("GetIconAttr",
+             &This::GetIconAttr)
+        .def("CreateIconAttr",
+             &_CreateIconAttr,
+             (arg("defaultValue")=object(),
+              arg("writeSparsely")=false))
+        
+        .def("GetExpansionStateAttr",
+             &This::GetExpansionStateAttr)
+        .def("CreateExpansionStateAttr",
+             &_CreateExpansionStateAttr,
+             (arg("defaultValue")=object(),
+              arg("writeSparsely")=false))
+        
+        .def("GetSizeAttr",
+             &This::GetSizeAttr)
+        .def("CreateSizeAttr",
+             &_CreateSizeAttr,
+             (arg("defaultValue")=object(),
+              arg("writeSparsely")=false))
 
     ;
 
@@ -134,8 +181,16 @@ void wrapUsdUINodeGraphNodeAPI()
 // }
 //
 // Of course any other ancillary or support code may be provided.
+// 
+// Just remember to wrap code in the appropriate delimiters:
+// 'namespace {', '}'.
+//
 // ===================================================================== //
 // --(BEGIN CUSTOM CODE)--
 
+namespace {
+
 WRAP_CUSTOM {
 }
+
+} // anonymous namespace

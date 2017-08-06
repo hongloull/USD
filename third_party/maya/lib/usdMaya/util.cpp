@@ -21,32 +21,112 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
+#include "pxr/pxr.h"
 #include "usdMaya/util.h"
 
 #include "pxr/base/gf/gamma.h"
 #include "pxr/base/tf/hashmap.h"
 #include "pxr/usd/usdGeom/mesh.h"
 
+#include <maya/MAnimControl.h>
 #include <maya/MAnimUtil.h>
 #include <maya/MColor.h>
 #include <maya/MDGModifier.h>
+#include <maya/MDagPath.h>
 #include <maya/MFnDagNode.h>
 #include <maya/MFnDependencyNode.h>
 #include <maya/MFnEnumAttribute.h>
 #include <maya/MFnExpression.h>
 #include <maya/MFnLambertShader.h>
+#include <maya/MFnNumericAttribute.h>
+#include <maya/MFnTypedAttribute.h>
 #include <maya/MFnSet.h>
 #include <maya/MItDependencyGraph.h>
+#include <maya/MItDependencyNodes.h>
+#include <maya/MItMeshFaceVertex.h>
 #include <maya/MItMeshPolygon.h>
+#include <maya/MObject.h>
 #include <maya/MPlugArray.h>
+#include <maya/MSelectionList.h>
+#include <maya/MStatus.h>
+#include <maya/MString.h>
 #include <maya/MTime.h>
 
+#include <string>
+#include <unordered_map>
+
+PXR_NAMESPACE_USING_DIRECTIVE
 
 // return seconds per frame
 double PxrUsdMayaUtil::spf()
 {
     static const MTime sec(1.0, MTime::kSeconds);
     return 1.0 / sec.as(MTime::uiUnit());
+}
+
+MStatus
+PxrUsdMayaUtil::GetMObjectByName(const std::string& nodeName, MObject& mObj)
+{
+    MSelectionList selectionList;
+    MStatus status = selectionList.add(MString(nodeName.c_str()));
+    if (status != MS::kSuccess) {
+        return status;
+    }
+
+    status = selectionList.getDependNode(0, mObj);
+
+    return status;
+}
+
+MStatus
+PxrUsdMayaUtil::GetDagPathByName(const std::string& nodeName, MDagPath& dagPath)
+{
+    MSelectionList selectionList;
+    MStatus status = selectionList.add(MString(nodeName.c_str()));
+    if (status != MS::kSuccess) {
+        return status;
+    }
+
+    status = selectionList.getDagPath(0, dagPath);
+
+    return status;
+}
+
+MPlug
+PxrUsdMayaUtil::GetMayaTimePlug()
+{
+    MPlug timePlug;
+    MStatus status;
+
+    // As an extra sanity check, we only return a discovered plug if its
+    // value matches the current time.
+    MTime curTime = MAnimControl::currentTime();
+
+    MItDependencyNodes iter(MFn::kTime, &status);
+    CHECK_MSTATUS_AND_RETURN(status, timePlug);
+
+    while (!timePlug && !iter.isDone()) {
+        MObject node = iter.thisNode();
+        iter.next();
+
+        MFnDependencyNode depNodeFn(node, &status);
+        if (status != MS::kSuccess) {
+            continue;
+        }
+
+        MPlug outTimePlug = depNodeFn.findPlug("outTime", true, &status);
+        if (status != MS::kSuccess || !outTimePlug) {
+            continue;
+        }
+
+        if (outTimePlug.asMTime() != curTime) {
+            continue;
+        }
+
+        timePlug = outTimePlug;
+    }
+
+    return timePlug;
 }
 
 bool PxrUsdMayaUtil::isAncestorDescendentRelationship(const MDagPath & path1,
@@ -473,9 +553,9 @@ _getAttachedMayaShaderObjects(
     // only a subset of the object in it, we'll keep track of the assignments
     // for all components in assignmentIndices. We initialize all of the
     // assignments as unassigned using a value of -1.
-    if (numComponents > 1 and
-            (setObjs.length() > 1 or
-             (setObjs.length() == 1 and not compObjs[0].isNull()))) {
+    if (numComponents > 1 && 
+            (setObjs.length() > 1 || 
+             (setObjs.length() == 1 && !compObjs[0].isNull()))) {
         assignmentIndices->assign((size_t)numComponents, -1);
     }
 
@@ -504,11 +584,11 @@ _getAttachedMayaShaderObjects(
 
         // If we are tracking per-component assignments, mark all components of
         // this set as assigned to this shader.
-        if (not assignmentIndices->empty()) {
+        if (!assignmentIndices->empty()) {
             size_t shaderIndex = inserted.first->second;
 
             MItMeshPolygon faceIt(node.dagPath(), compObjs[i]);
-            for (faceIt.reset(); not faceIt.isDone(); faceIt.next()) {
+            for (faceIt.reset(); !faceIt.isDone(); faceIt.next()) {
                 (*assignmentIndices)[faceIt.index()] = shaderIndex;
             }
         }
@@ -555,11 +635,11 @@ _GetColorAndTransparencyFromDepNode(
     MStatus status;
     MFnDependencyNode d(shaderObj);
     MPlug colorPlug = d.findPlug("color", &status);
-    if (not status) {
+    if (!status) {
         return false;
     }
     MPlug transparencyPlug = d.findPlug("transparency", &status);
-    if (not status) {
+    if (!status) {
         return false;
     }
 
@@ -627,12 +707,12 @@ _getMayaShadersColor(
                 RGBData ?  &(*RGBData)[i] : NULL,
                 AlphaData ?  &(*AlphaData)[i] : NULL)
 
-            or _GetColorAndTransparencyFromDepNode(
+            || _GetColorAndTransparencyFromDepNode(
                 shaderObjs[i],
                 RGBData ?  &(*RGBData)[i] : NULL,
                 AlphaData ?  &(*AlphaData)[i] : NULL);
 
-        if (not gotValues) {
+        if (!gotValues) {
             MGlobal::displayError("Failed to get shaders colors at index: " +
                                   MString(TfStringPrintf("%d", i).c_str()) +
                                   ". Unable to retrieve ShaderBaseColor.");
@@ -652,7 +732,7 @@ _GetLinearShaderColor(
 {
     MObjectArray shaderObjs;
     if (_getAttachedMayaShaderObjects(node, numComponents, &shaderObjs, assignmentIndices)) {
-        if (assignmentIndices and interpolation) {
+        if (assignmentIndices && interpolation) {
             if (assignmentIndices->empty()) {
                 *interpolation = UsdGeomTokens->constant;
             } else {
@@ -701,6 +781,231 @@ PxrUsdMayaUtil::GetLinearShaderColor(
                                  assignmentIndices);
 }
 
+template <typename T>
+struct ValueHash
+{
+    std::size_t operator() (const T& value) const {
+        return hash_value(value);
+    }
+};
+
+// There is no globally defined hash_value for numeric types
+// so we need an explicit opt-in here.
+template <>
+struct ValueHash<float>
+{
+    std::size_t operator() (const float& value) const {
+        return boost::hash_value(value);
+    }
+};
+
+template <typename T>
+struct ValuesEqual
+{
+    bool operator() (const T& a, const T& b) const {
+        return GfIsClose(a, b, 1e-9);
+    }
+};
+
+template <typename T>
+static
+void
+_MergeEquivalentIndexedValues(
+        VtArray<T>* valueData,
+        VtArray<int>* assignmentIndices)
+{
+    if (!valueData || !assignmentIndices) {
+        return;
+    }
+
+    const size_t numValues = valueData->size();
+    if (numValues == 0) {
+        return;
+    }
+
+    // We maintain a map of values to that value's index in our uniqueValues
+    // array.
+    std::unordered_map<T, size_t, ValueHash<T>, ValuesEqual<T> > valuesMap;
+    VtArray<T> uniqueValues;
+    VtArray<int> uniqueIndices;
+
+    for (size_t i = 0; i < assignmentIndices->size(); ++i) {
+        int index = (*assignmentIndices)[i];
+
+        if (index < 0 || static_cast<size_t>(index) >= numValues) {
+            // This is an unassigned or otherwise unknown index, so just keep it.
+            uniqueIndices.push_back(index);
+            continue;
+        }
+
+        const T value = (*valueData)[index];
+
+        int uniqueIndex = -1;
+
+        auto inserted = valuesMap.insert(
+            std::pair<T, size_t>(value, uniqueValues.size()));
+        if (inserted.second) {
+            // This is a new value, so add it to the array.
+            uniqueValues.push_back(value);
+            uniqueIndex = uniqueValues.size() - 1;
+        } else {
+            // This is an existing value, so re-use the original's index.
+            uniqueIndex = inserted.first->second;
+        }
+
+        uniqueIndices.push_back(uniqueIndex);
+    }
+
+    // If we reduced the number of values by merging, copy the results back.
+    if (uniqueValues.size() < numValues) {
+        (*valueData) = uniqueValues;
+        (*assignmentIndices) = uniqueIndices;
+    }
+}
+
+void
+PxrUsdMayaUtil::MergeEquivalentIndexedValues(
+        VtArray<float>* valueData,
+        VtArray<int>* assignmentIndices) {
+    return _MergeEquivalentIndexedValues<float>(valueData, assignmentIndices);
+}
+
+void
+PxrUsdMayaUtil::MergeEquivalentIndexedValues(
+        VtArray<GfVec2f>* valueData,
+        VtArray<int>* assignmentIndices) {
+    return _MergeEquivalentIndexedValues<GfVec2f>(valueData, assignmentIndices);
+}
+
+void
+PxrUsdMayaUtil::MergeEquivalentIndexedValues(
+        VtArray<GfVec3f>* valueData,
+        VtArray<int>* assignmentIndices) {
+    return _MergeEquivalentIndexedValues<GfVec3f>(valueData, assignmentIndices);
+}
+
+void
+PxrUsdMayaUtil::MergeEquivalentIndexedValues(
+        VtArray<GfVec4f>* valueData,
+        VtArray<int>* assignmentIndices) {
+    return _MergeEquivalentIndexedValues<GfVec4f>(valueData, assignmentIndices);
+}
+
+void
+PxrUsdMayaUtil::CompressFaceVaryingPrimvarIndices(
+        const MFnMesh& mesh,
+        TfToken *interpolation,
+        VtArray<int>* assignmentIndices)
+{
+    if (!interpolation     || 
+        !assignmentIndices || 
+         assignmentIndices->size() == 0) {
+        return;
+    }
+
+    // Use -2 as the initial "un-stored" sentinel value, since -1 is the
+    // default unauthored value index for primvars.
+    int numPolygons = mesh.numPolygons();
+    VtArray<int> uniformAssignments;
+    uniformAssignments.assign((size_t)numPolygons, -2);
+
+    int numVertices = mesh.numVertices();
+    VtArray<int> vertexAssignments;
+    vertexAssignments.assign((size_t)numVertices, -2);
+
+    // We assume that the data is constant/uniform/vertex until we can
+    // prove otherwise that two components have differing values.
+    bool isConstant = true;
+    bool isUniform = true;
+    bool isVertex = true;
+
+    MItMeshFaceVertex itFV(mesh.object());
+    unsigned int fvi = 0;
+    for (itFV.reset(); !itFV.isDone(); itFV.next(), ++fvi) {
+        int faceIndex = itFV.faceId();
+        int vertexIndex = itFV.vertId();
+
+        int assignedIndex = (*assignmentIndices)[fvi];
+
+        if (isConstant) {
+            if (assignedIndex != (*assignmentIndices)[0]) {
+                isConstant = false;
+            }
+        }
+
+        if (isUniform) {
+            if (uniformAssignments[faceIndex] < -1) {
+                // No value for this face yet, so store one.
+                uniformAssignments[faceIndex] = assignedIndex;
+            } else if (assignedIndex != uniformAssignments[faceIndex]) {
+                isUniform = false;
+            }
+        }
+
+        if (isVertex) {
+            if (vertexAssignments[vertexIndex] < -1) {
+                // No value for this vertex yet, so store one.
+                vertexAssignments[vertexIndex] = assignedIndex;
+            } else if (assignedIndex != vertexAssignments[vertexIndex]) {
+                isVertex = false;
+            }
+        }
+
+        if (!isConstant && !isUniform && !isVertex) {
+            // No compression will be possible, so stop trying.
+            break;
+        }
+    }
+
+    if (isConstant) {
+        assignmentIndices->resize(1);
+        *interpolation = UsdGeomTokens->constant;
+    } else if (isUniform) {
+        *assignmentIndices = uniformAssignments;
+        *interpolation = UsdGeomTokens->uniform;
+    } else if(isVertex) {
+        *assignmentIndices = vertexAssignments;
+        *interpolation = UsdGeomTokens->vertex;
+    } else {
+        *interpolation = UsdGeomTokens->faceVarying;
+    }
+}
+
+bool
+PxrUsdMayaUtil::AddUnassignedUVIfNeeded(
+        VtArray<GfVec2f>* uvData,
+        VtArray<int>* assignmentIndices,
+        int* unassignedValueIndex,
+        const GfVec2f& defaultUV)
+{
+    if (!assignmentIndices || assignmentIndices->empty()) {
+        return false;
+    }
+
+    *unassignedValueIndex = -1;
+
+    for (size_t i = 0; i < assignmentIndices->size(); ++i) {
+        if ((*assignmentIndices)[i] >= 0) {
+            // This component has an assignment, so skip it.
+            continue;
+        }
+
+        // We found an unassigned index. Add the unassigned value to uvData
+        // if we haven't already.
+        if (*unassignedValueIndex < 0) {
+            if (uvData) {
+                uvData->push_back(defaultUV);
+            }
+            *unassignedValueIndex = uvData->size() - 1;
+        }
+
+        // Assign the component the unassigned value index.
+        (*assignmentIndices)[i] = *unassignedValueIndex;
+    }
+
+    return true;
+}
+
 bool
 PxrUsdMayaUtil::AddUnassignedColorAndAlphaIfNeeded(
         VtArray<GfVec3f>* RGBData,
@@ -710,11 +1015,11 @@ PxrUsdMayaUtil::AddUnassignedColorAndAlphaIfNeeded(
         const GfVec3f& defaultRGB,
         const float defaultAlpha)
 {
-    if (not assignmentIndices or assignmentIndices->empty()) {
+    if (!assignmentIndices || assignmentIndices->empty()) {
         return false;
     }
 
-    if (RGBData and AlphaData and (RGBData->size() != AlphaData->size())) {
+    if (RGBData && AlphaData && (RGBData->size() != AlphaData->size())) {
         TF_CODING_ERROR("Unequal sizes for color (%zu) and opacity (%zu)",
                         RGBData->size(), AlphaData->size());
     }
@@ -791,7 +1096,7 @@ _IsShape(const MDagPath& dagPath) {
     // go to the parent
     MDagPath parentDagPath = dagPath;
     parentDagPath.pop();
-    if (not parentDagPath.hasFn(MFn::kTransform)) {
+    if (!parentDagPath.hasFn(MFn::kTransform)) {
         return false;
     }
 
@@ -811,7 +1116,7 @@ PxrUsdMayaUtil::MDagPathToUsdPath(const MDagPath& dagPath, bool mergeTransformAn
     std::replace( usdPathStr.begin(), usdPathStr.end(), ':', '_'); // replace namespace ":" with "_"
 
     SdfPath usdPath(usdPathStr);
-    if (mergeTransformAndShape and _IsShape(dagPath)) {
+    if (mergeTransformAndShape && _IsShape(dagPath)) {
         usdPath = usdPath.GetParentPath();
     }
 
@@ -822,7 +1127,7 @@ bool PxrUsdMayaUtil::GetBoolCustomData(UsdAttribute obj, TfToken key, bool defau
 {
     bool returnValue=defaultValue;
     VtValue data = obj.GetCustomDataByKey(key);
-    if (not data.IsEmpty()) {
+    if (!data.IsEmpty()) {
         if (data.IsHolding<bool>()) {
             return data.Get<bool>();
         } else {
@@ -902,5 +1207,46 @@ PxrUsdMayaUtil::setPlugValue(
 
     CHECK_MSTATUS_AND_RETURN(status, false);
 
+    return true;
+}
+
+bool
+PxrUsdMayaUtil::createStringAttribute(
+        MFnDependencyNode& depNode,
+        const MString& attr) {
+    MStatus status = MStatus::kFailure;
+    MFnTypedAttribute typedAttrFn;
+    MObject attrObj = typedAttrFn.create(
+            attr,
+            attr,
+            MFnData::kString,
+            MObject::kNullObj,
+            &status);
+    CHECK_MSTATUS_AND_RETURN(status, false);
+    
+    status = depNode.addAttribute(attrObj);
+    CHECK_MSTATUS_AND_RETURN(status, false);
+    
+    return true;
+}
+
+bool
+PxrUsdMayaUtil::createNumericAttribute(
+        MFnDependencyNode& depNode,
+        const MString& attr,
+        MFnNumericData::Type type) {
+    MStatus status = MStatus::kFailure;
+    MFnNumericAttribute numericAttrFn;
+    MObject attrObj = numericAttrFn.create(
+            attr,
+            attr,
+            type,
+            0,
+            &status);
+    CHECK_MSTATUS_AND_RETURN(status, false);
+    
+    status = depNode.addAttribute(attrObj);
+    CHECK_MSTATUS_AND_RETURN(status, false);
+    
     return true;
 }

@@ -22,12 +22,11 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/usd/usdShade/material.h"
-
 #include "pxr/usd/usd/schemaBase.h"
-#include "pxr/usd/usd/conversions.h"
 
 #include "pxr/usd/sdf/primSpec.h"
 
+#include "pxr/usd/usd/pyConversions.h"
 #include "pxr/base/tf/pyContainerConversions.h"
 #include "pxr/base/tf/pyResultConversions.h"
 #include "pxr/base/tf/pyUtils.h"
@@ -39,6 +38,10 @@
 
 using namespace boost::python;
 
+PXR_NAMESPACE_USING_DIRECTIVE
+
+namespace {
+
 #define WRAP_CUSTOM                                                     \
     template <class Cls> static void _CustomWrapCode(Cls &_class)
 
@@ -46,11 +49,13 @@ using namespace boost::python;
 WRAP_CUSTOM;
 
 
+} // anonymous namespace
+
 void wrapUsdShadeMaterial()
 {
     typedef UsdShadeMaterial This;
 
-    class_<This, bases<UsdShadeSubgraph> >
+    class_<This, bases<UsdShadeNodeGraph> >
         cls("Material");
 
     cls
@@ -94,10 +99,17 @@ void wrapUsdShadeMaterial()
 // }
 //
 // Of course any other ancillary or support code may be provided.
+// 
+// Just remember to wrap code in the appropriate delimiters:
+// 'namespace {', '}'.
+//
 // ===================================================================== //
 // --(BEGIN CUSTOM CODE)--
 
 #include "pxr/usd/usd/editContext.h"
+#include "pxr/usd/usd/pyEditContext.h"
+
+namespace {
 
 static UsdPyEditContext
 _GetEditContextForVariant(const UsdShadeMaterial &self,
@@ -149,16 +161,7 @@ WRAP_CUSTOM {
         .def("HasMaterialFaceSet", &UsdShadeMaterial::HasMaterialFaceSet)
             .staticmethod("HasMaterialFaceSet")
 
-        .def("CreateSurfaceTerminal", 
-             &UsdShadeMaterial::CreateSurfaceTerminal,
-             (arg("targetPath")))
-        .def("GetSurfaceTerminal",
-             &UsdShadeMaterial::GetSurfaceTerminal)
-
-        .def("CreateDisplacementTerminal", 
-             &UsdShadeMaterial::CreateDisplacementTerminal,
-             (arg("targetPath")))
-        .def("GetDisplacementTerminal",
-             &UsdShadeMaterial::GetDisplacementTerminal)
         ;
 }
+
+} // anonymous namespace

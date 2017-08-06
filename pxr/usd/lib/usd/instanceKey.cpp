@@ -21,11 +21,13 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
+#include "pxr/pxr.h"
 #include "pxr/usd/usd/instanceKey.h"
 
 #include "pxr/usd/usd/resolver.h"
 
-#include <boost/foreach.hpp>
+PXR_NAMESPACE_OPEN_SCOPE
+
 
 Usd_InstanceKey::Usd_InstanceKey()
 {
@@ -34,30 +36,23 @@ Usd_InstanceKey::Usd_InstanceKey()
 Usd_InstanceKey::Usd_InstanceKey(const PcpPrimIndex& instance)
     : _pcpInstanceKey(instance)
 {
-    for (Usd_Resolver res(&instance); res.IsValid(); res.NextNode()) {
-        Usd_ResolvedClipInfo clipInfo;
-        Usd_ResolveClipInfo(res.GetNode(), &clipInfo);
-        if (clipInfo.clipAssetPaths
-            or clipInfo.clipManifestAssetPath
-            or clipInfo.clipPrimPath
-            or clipInfo.clipActive
-            or clipInfo.clipTimes) {
-            _clipInfo.push_back(clipInfo);
-        }
+    std::vector<Usd_ResolvedClipInfo> clipInfo;
+    if (Usd_ResolveClipInfo(instance, &clipInfo)) {
+        _clipInfo.swap(clipInfo);
     }
 }
 
 bool 
 Usd_InstanceKey::operator==(const Usd_InstanceKey& rhs) const
 {
-    return _pcpInstanceKey == rhs._pcpInstanceKey and
+    return _pcpInstanceKey == rhs._pcpInstanceKey &&
         _clipInfo == rhs._clipInfo;
 }
 
 bool
 Usd_InstanceKey::operator!=(const Usd_InstanceKey& rhs) const
 {
-    return not (*this == rhs);
+    return !(*this == rhs);
 }
 
 size_t hash_value(const Usd_InstanceKey& key)
@@ -69,3 +64,6 @@ size_t hash_value(const Usd_InstanceKey& key)
 
     return hash;
 }
+
+PXR_NAMESPACE_CLOSE_SCOPE
+

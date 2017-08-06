@@ -24,16 +24,23 @@
 #ifndef VT_VALUE_H
 #define VT_VALUE_H
 
+// XXX: Include pyLock.h after pyObjWrapper.h to work around
+// Python include ordering issues.
+
+#include "pxr/pxr.h"
+#include "pxr/base/tf/pyObjWrapper.h"
+#include "pxr/base/tf/pyLock.h"
+
 #include "pxr/base/arch/demangle.h"
 #include "pxr/base/arch/hints.h"
 #include "pxr/base/tf/move.h"
 #include "pxr/base/tf/pointerAndBits.h"
-#include "pxr/base/tf/pyObjWrapper.h"
 #include "pxr/base/tf/safeTypeCompare.h"
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/tf/tf.h"
 #include "pxr/base/tf/type.h"
 
+#include "pxr/base/vt/api.h"
 #include "pxr/base/vt/hash.h"
 #include "pxr/base/vt/streamOut.h"
 #include "pxr/base/vt/traits.h"
@@ -43,7 +50,6 @@
 #include <boost/intrusive_ptr.hpp>
 #include <boost/mpl/and.hpp>
 #include <boost/mpl/if.hpp>
-#include <boost/static_assert.hpp>
 #include <boost/type_traits/decay.hpp>
 #include <boost/type_traits/has_trivial_assign.hpp>
 #include <boost/type_traits/has_trivial_constructor.hpp>
@@ -55,8 +61,11 @@
 
 #include <tbb/atomic.h>
 
-#include <typeinfo>
 #include <iostream>
+#include <memory>
+#include <typeinfo>
+
+PXR_NAMESPACE_OPEN_SCOPE
 
 /// Make a default value.
 /// VtValue uses this to create values to be returned from failed calls to \a
@@ -73,7 +82,7 @@ struct Vt_DefaultValueHolder
     template<class T>
     static Vt_DefaultValueHolder Create(T const &val) {
         return Vt_DefaultValueHolder(
-            boost::shared_ptr<void>(new T(val)), typeid(T));
+            std::shared_ptr<void>(new T(val)), typeid(T));
     }
 
     // Return the runtime type of the held object.
@@ -88,11 +97,11 @@ struct Vt_DefaultValueHolder
     }
 
 private:
-    Vt_DefaultValueHolder(boost::shared_ptr<void> const &ptr,
+    Vt_DefaultValueHolder(std::shared_ptr<void> const &ptr,
                           std::type_info const &type)
         : _ptr(ptr), _type(type) {}
 
-    boost::shared_ptr<void> _ptr;
+    std::shared_ptr<void> _ptr;
     std::type_info const &_type;
 };
 
@@ -100,7 +109,7 @@ class VtValue;
 
 // Overload VtStreamOut for vector<VtValue>.  Produces output like [value1,
 // value2, ... valueN].
-std::ostream &VtStreamOut(std::vector<VtValue> const &val, std::ostream &);
+VT_API std::ostream &VtStreamOut(std::vector<VtValue> const &val, std::ostream &);
 
 // Base implementations for VtGetProxied{Type,Value}.
 template <class T>
@@ -210,17 +219,23 @@ class VtValue
     // should be stored remotely.
     template <class T>
     struct _UsesLocalStore : boost::mpl::bool_<
-        (sizeof(T) <= sizeof(_Storage)) and
+        (sizeof(T) <= sizeof(_Storage)) &&
         VtValueTypeHasCheapCopy<T>::value > {};
 
     // Type information base class.
     struct _TypeInfo {
+    protected:
+        ~_TypeInfo() = default;
+
+    public:
         constexpr _TypeInfo(const std::type_info &ti,
                             const std::type_info &elementTi,
-                           bool isArray)
+                            bool isArray,
+                            bool isHashable)
             : typeInfo(ti)
             , elementTypeInfo(elementTi)
             , isArray(isArray)
+            , isHashable(isHashable)
             {}
 
         virtual void CopyInit(_Storage const &, _Storage &) const = 0;
@@ -242,6 +257,7 @@ class VtValue
         const std::type_info &typeInfo;
         const std::type_info &elementTypeInfo;
         bool isArray;
+        bool isHashable;
     };
 
     // Type-dispatching overloads.
@@ -280,7 +296,8 @@ class VtValue
         constexpr _TypeInfoImpl()
             : _TypeInfo(typeid(T),
                         _ArrayHelper<T>::GetElementTypeid(),
-                        VtIsArray<T>::value) {}
+                        VtIsArray<T>::value,
+                        VtIsHashable<T>()) {}
 
         ////////////////////////////////////////////////////////////////////
         // Typed API for client use.
@@ -297,7 +314,8 @@ class VtValue
         }
 
     private:
-        BOOST_STATIC_ASSERT(sizeof(Container) <= sizeof(_Storage));
+        static_assert(sizeof(Container) <= sizeof(_Storage),
+                      "Container size cannot exceed storage size.");
 
         ////////////////////////////////////////////////////////////////////
         // Virtual function implementations.
@@ -412,7 +430,7 @@ class VtValue
         typedef boost::intrusive_ptr<_Counted<T> > Ptr;
         // Get returns object stored in the pointed-to _Counted<T>.
         static T &_GetMutableObj(Ptr &ptr) {
-            if (not ptr->IsUnique())
+            if (!ptr->IsUnique())
                 ptr.reset(new _Counted<T>(ptr->Get()));
             return ptr->GetMutable();
         }
@@ -430,6 +448,15 @@ class VtValue
         typedef typename boost::mpl::if_<_UsesLocalStore<T>,
                                          _LocalTypeInfo<T>,
                                          _RemoteTypeInfo<T> >::type Type;
+    };
+
+    // Make sure char[N] is treated as a string.
+    template <size_t N>
+    struct _TypeInfoFor<char[N]> {
+        // return _UsesLocalStore(T) ? _LocalTypeInfo<T> : _RemoteTypeInfo<T>;
+        typedef typename boost::mpl::if_<_UsesLocalStore<std::string>,
+                                         _LocalTypeInfo<std::string>,
+                                         _RemoteTypeInfo<std::string> >::type Type;
     };
 
     // Runtime function to return a _TypeInfo base pointer to a specific
@@ -454,7 +481,7 @@ class VtValue
     friend struct _HoldAside;
     struct _HoldAside {
         explicit _HoldAside(VtValue *val)
-            : info((val->IsEmpty() or val->_IsLocalAndTriviallyCopyable())
+            : info((val->IsEmpty() || val->_IsLocalAndTriviallyCopyable())
                    ? static_cast<_TypeInfo const *>(NULL) : val->_info) {
             if (info)
                 info->Move(val->_storage, storage);
@@ -549,7 +576,7 @@ public:
     template <class T>
     inline
     typename boost::enable_if_c<
-        _TypeInfoFor<T>::Type::IsLocal and
+        _TypeInfoFor<T>::Type::IsLocal &&
         _TypeInfoFor<T>::Type::HasTrivialCopy,
     VtValue &>::type
     operator=(T obj) {
@@ -561,7 +588,7 @@ public:
     /// Assignment operator from any type.
     template <class T>
     typename boost::disable_if_c<
-        _TypeInfoFor<T>::Type::IsLocal and
+        _TypeInfoFor<T>::Type::IsLocal &&
         _TypeInfoFor<T>::Type::HasTrivialCopy,
     VtValue &>::type
     operator=(T const &obj) {
@@ -586,7 +613,7 @@ public:
     /// Swap this with \a rhs.
     VtValue &Swap(VtValue &rhs) {
         // Do nothing if both empty.  Otherwise general swap.
-        if (not IsEmpty() or not rhs.IsEmpty()) {
+        if (!IsEmpty() || !rhs.IsEmpty()) {
             VtValue tmp;
             _Move(*this, tmp);
             _Move(rhs, *this);
@@ -606,7 +633,7 @@ public:
     typename boost::enable_if<
         boost::is_same<T, typename Vt_ValueGetStored<T>::Type> >::type
     Swap(T &rhs) {
-        if (not IsHolding<T>())
+        if (!IsHolding<T>())
             *this = T();
         UncheckedSwap(rhs);
     }
@@ -652,28 +679,28 @@ public:
     /// otherwise.
     template <class T>
     bool IsHolding() const {
-        return _info and _TypeIs<T>();
+        return _info && _TypeIs<T>();
     }
 
     /// Returns true iff this is holding an array type (see VtIsArray<>).
-    bool IsArrayValued() const;
+    VT_API bool IsArrayValued() const;
 
     /// Return the number of elements in the held value if IsArrayValued(),
     /// return 0 otherwise.
-    size_t GetArraySize() const { return _GetNumElements(); }
+    VT_API size_t GetArraySize() const { return _GetNumElements(); }
 
     /// Returns the typeid of the type held by this value.
-    std::type_info const &GetTypeid() const;
+    VT_API std::type_info const &GetTypeid() const;
 
     /// Return the typeid of elements in a array valued type.  If not
     /// holding an array valued type, return typeid(void).
-    std::type_info const &GetElementTypeid() const;
+    VT_API std::type_info const &GetElementTypeid() const;
 
     /// Returns the TfType of the type held by this value.
-    TfType GetType() const;
+    VT_API TfType GetType() const;
 
     /// Return the type name of the held typeid.
-    std::string GetTypeName() const;
+    VT_API std::string GetTypeName() const;
 
     /// Returns a const reference to the held object if the held object
     /// is of type \a T.  Invokes undefined behavior otherwise.  This is the
@@ -695,7 +722,7 @@ public:
 
         // In the unlikely case that the types don't match, we obtain a default
         // value to return and issue an error via _FailGet.
-        if (ARCH_UNLIKELY(not IsHolding<T>())) {
+        if (ARCH_UNLIKELY(!IsHolding<T>())) {
             return *(static_cast<T const *>(
                          _FailGet(Factory::Invoke, typeid(T))));
         }
@@ -753,7 +780,8 @@ public:
     /// mutate the operant \p val.
     ///
     /// \sa \ref VtValue_Casting
-    static VtValue CastToTypeOf(VtValue const &val, VtValue const &other);
+    VT_API static VtValue
+    CastToTypeOf(VtValue const &val, VtValue const &other);
 
     /// Return a VtValue holding \a val cast to \a type.  Return empty VtValue
     /// if cast fails.
@@ -762,7 +790,8 @@ public:
     /// mutate the operant \p val.
     ///
     /// \sa \ref VtValue_Casting
-    static VtValue CastToTypeid(VtValue const &val, std::type_info const &type);
+    VT_API static VtValue
+    CastToTypeid(VtValue const &val, std::type_info const &type);
 
     /// Return if a value of type \a from can be cast to type \a to.
     ///
@@ -831,10 +860,13 @@ public:
     }
 
     /// Returns true iff this value is empty.
-    bool IsEmpty() const { return not _info; }
+    bool IsEmpty() const { return !_info; }
+
+    /// Return true if the held object provides a hash implementation.
+    VT_API bool CanHash() const;
 
     /// Return a hash code for the held object by calling VtHashValue() on it.
-    size_t GetHash() const;
+    VT_API size_t GetHash() const;
 
     friend inline size_t hash_value(VtValue const &val) {
         return val.GetHash();
@@ -844,7 +876,7 @@ public:
     template <typename T>
     friend bool operator == (VtValue const &lhs, T const &rhs) {
         typedef typename Vt_ValueGetStored<T>::Type Stored;
-        return lhs.IsHolding<Stored>() and lhs.UncheckedGet<Stored>() == rhs;
+        return lhs.IsHolding<Stored>() && lhs.UncheckedGet<Stored>() == rhs;
     }
     template <typename T>
     friend bool operator == (T const &lhs, VtValue const &rhs) {
@@ -854,26 +886,27 @@ public:
     /// Tests for inequality.
     template <typename T>
     friend bool operator != (VtValue const &lhs, T const &rhs) {
-        return not (lhs == rhs);
+        return !(lhs == rhs);
     }
     template <typename T>
     friend bool operator != (T const &lhs, VtValue const &rhs) {
-        return not (lhs == rhs);
+        return !(lhs == rhs);
     }
 
     /// Test two values for equality.
     bool operator == (const VtValue &rhs) const {
         bool empty = IsEmpty(), rhsEmpty = rhs.IsEmpty();
-        if (empty or rhsEmpty)
+        if (empty || rhsEmpty)
             return empty == rhsEmpty;
         if (_info == rhs._info)
             return _info->Equal(_storage, rhs._storage);
         return _EqualityImpl(rhs);
     }
-    bool operator != (const VtValue &rhs) const { return not (*this == rhs); }
+    bool operator != (const VtValue &rhs) const { return !(*this == rhs); }
 
     /// Calls through to operator << on the held object.
-    friend std::ostream &operator << (std::ostream &out, const VtValue &self);
+    VT_API friend std::ostream &
+    operator << (std::ostream &out, const VtValue &self);
 
 private:
     const Vt_Reserved* _GetReserved() const;
@@ -921,12 +954,12 @@ private:
     inline bool _TypeIs() const {
         std::type_info const &t = typeid(T);
         bool cmp = TfSafeTypeCompare(_info->typeInfo, t);
-        return ARCH_UNLIKELY(_IsProxy() and not cmp) ? _TypeIsImpl(t) : cmp;
+        return ARCH_UNLIKELY(_IsProxy() && !cmp) ? _TypeIsImpl(t) : cmp;
     }
 
-    bool _TypeIsImpl(std::type_info const &queriedType) const;
+    VT_API bool _TypeIsImpl(std::type_info const &queriedType) const;
 
-    bool _EqualityImpl(VtValue const &rhs) const;
+    VT_API bool _EqualityImpl(VtValue const &rhs) const;
 
     template <class Proxy>
     typename boost::enable_if<VtIsValueProxy<Proxy>, Proxy &>::type
@@ -961,13 +994,13 @@ private:
 
     // Helper invoked in case Get fails.  Reports an error and returns a default
     // value for \a queryType.
-    void const *
+    VT_API void const *
     _FailGet(Vt_DefaultValueHolder (*factory)(),
              std::type_info const &queryType) const;
 
     inline void _Clear() {
         // optimize for local types not to deref _info.
-        if (_info and not _IsLocalAndTriviallyCopyable())
+        if (_info && !_IsLocalAndTriviallyCopyable())
             _info->Destroy(_storage);
         _info.Set(nullptr, 0);
     }
@@ -982,13 +1015,15 @@ private:
         return _info.BitsAs<unsigned int>() & _ProxyFlag;
     }
 
-    static void _RegisterCast(std::type_info const &from,
+    VT_API static void _RegisterCast(std::type_info const &from,
                               std::type_info const &to,
                               VtValue (*castFn)(VtValue const &));
 
-    static VtValue _PerformCast(std::type_info const &to, VtValue const &val);
+    VT_API static VtValue
+    _PerformCast(std::type_info const &to, VtValue const &val);
 
-    static bool _CanCast(std::type_info const &from, std::type_info const &to);
+    VT_API static bool
+    _CanCast(std::type_info const &from, std::type_info const &to);
 
     // helper template function for simple casts from From to To.
     template <typename From, typename To>
@@ -1003,11 +1038,13 @@ private:
     friend TfPyObjWrapper
     Vt_GetPythonObjectFromHeldValue(VtValue const &self);
 
-    TfPyObjWrapper _GetPythonObject() const;
+    VT_API TfPyObjWrapper _GetPythonObject() const;
 
     _Storage _storage;
     TfPointerAndBits<const _TypeInfo> _info;
 };
+
+#if !defined(doxygen)
 
 /// Make a default value.  VtValue uses this to create values to be returned
 /// from failed calls to \a Get.  Clients may specialize this for their own
@@ -1043,7 +1080,7 @@ struct Vt_ValueReservedAccess {
 //
 #define _VT_DECLARE_ZERO_VALUE_FACTORY(r, unused, elem)                 \
 template <>                                                             \
-Vt_DefaultValueHolder Vt_DefaultValueFactory<VT_TYPE(elem)>::Invoke();
+VT_API Vt_DefaultValueHolder Vt_DefaultValueFactory<VT_TYPE(elem)>::Invoke();
 
 BOOST_PP_SEQ_FOR_EACH(_VT_DECLARE_ZERO_VALUE_FACTORY,
                       unused,
@@ -1082,5 +1119,9 @@ inline bool
 VtValue::IsHolding<void>() const {
     return false;
 }
+
+#endif // !doxygen
+
+PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // VT_VALUE_H

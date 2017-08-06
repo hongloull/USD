@@ -24,9 +24,14 @@
 #ifndef USDIMAGING_GPRIM_ADAPTER_H
 #define USDIMAGING_GPRIM_ADAPTER_H
 
+#include "pxr/pxr.h"
+#include "pxr/usdImaging/usdImaging/api.h"
 #include "pxr/usdImaging/usdImaging/primAdapter.h"
 
 #include "pxr/usd/usdGeom/xformCache.h"
+
+PXR_NAMESPACE_OPEN_SCOPE
+
 
 class UsdGeomGprim;
 
@@ -46,39 +51,44 @@ public:
         : UsdImagingPrimAdapter()
     {}
 
+    USDIMAGING_API
     virtual ~UsdImagingGprimAdapter();
 
     // ---------------------------------------------------------------------- //
     /// \name Parallel Setup and Resolve
     // ---------------------------------------------------------------------- //
     
+    USDIMAGING_API
     virtual void TrackVariabilityPrep(UsdPrim const& prim,
                                       SdfPath const& cachePath,
-                                      int requestedBits,
+                                      HdDirtyBits requestedBits,
                                       UsdImagingInstancerContext const* 
                                           instancerContext = NULL);
 
     /// Thread Safe.
+    USDIMAGING_API
     virtual void TrackVariability(UsdPrim const& prim,
                                   SdfPath const& cachePath,
-                                  int requestedBits,
-                                  int* dirtyBits,
+                                  HdDirtyBits requestedBits,
+                                  HdDirtyBits* dirtyBits,
                                   UsdImagingInstancerContext const* 
                                       instancerContext = NULL);
 
+    USDIMAGING_API
     virtual void UpdateForTimePrep(UsdPrim const& prim,
                                    SdfPath const& cachePath, 
                                    UsdTimeCode time,
-                                   int requestedBits,
+                                   HdDirtyBits requestedBits,
                                    UsdImagingInstancerContext const* 
                                        instancerContext = NULL);
 
     /// Thread Safe.
+    USDIMAGING_API
     virtual void UpdateForTime(UsdPrim const& prim,
                                SdfPath const& cachePath, 
                                UsdTimeCode time,
-                               int requestedBits,
-                               int* dirtyBits,
+                               HdDirtyBits requestedBits,
+                               HdDirtyBits* dirtyBits,
                                UsdImagingInstancerContext const* 
                                    instancerContext = NULL);
 
@@ -86,20 +96,35 @@ public:
     /// \name Change Processing 
     // ---------------------------------------------------------------------- //
 
+    USDIMAGING_API
     virtual int ProcessPropertyChange(UsdPrim const& prim,
                                       SdfPath const& cachePath, 
                                       TfToken const& property);
 
     /// Returns the color and opacity for a given prim, taking into account
     /// surface shader colors and explicitly authored color on the prim.
+    USDIMAGING_API
     static VtValue GetColorAndOpacity(UsdPrim const& prim, 
                         UsdImagingValueCache::PrimvarInfo* primvarInfo,
                         UsdTimeCode time);
    
+protected:
+
+    /// This function can be overridden if the gprim adapter wants to have
+    /// control over the primvar discovery.
+    USDIMAGING_API
+    virtual void _DiscoverPrimvars(
+            UsdGeomGprim const& gprim,
+            SdfPath const& cachePath,
+            SdfPath const& shaderPath,
+            UsdTimeCode time,
+            UsdImagingValueCache* valueCache);
+
 private:
+
     /// Discover required primvars by searching for primvar inputs connected to
     /// the shader network.
-    void _DiscoverPrimvars(UsdGeomGprim const& gprim,
+    void _DiscoverPrimvarsFromShaderNetwork(UsdGeomGprim const& gprim,
                            SdfPath const& cachePath, 
                            UsdShadeShader const& shader,
                            UsdTimeCode time,
@@ -109,6 +134,13 @@ private:
     void _DiscoverPrimvarsDeprecated(UsdGeomGprim const& gprim,
                            SdfPath const& cachePath, 
                            UsdPrim const& shaderPrim,
+                           UsdTimeCode time,
+                           UsdImagingValueCache* valueCache);
+
+    // Helper method for the _DiscoverPrimvars methods above.
+    void _ComputeAndMergePrimvar(UsdGeomGprim const& gprim,
+                           SdfPath const& cachePath,
+                           TfToken const &primvarName,
                            UsdTimeCode time,
                            UsdImagingValueCache* valueCache);
 
@@ -126,5 +158,8 @@ private:
     /// Returns the surface shader for this prim
     SdfPath _GetSurfaceShader(UsdPrim const& prim);
 };
+
+
+PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif //USDIMAGING_GPRIM_ADAPTER_H

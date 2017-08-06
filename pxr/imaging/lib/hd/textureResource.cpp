@@ -31,6 +31,9 @@
 #include "pxr/imaging/glf/baseTexture.h"
 #include "pxr/imaging/glf/ptexTexture.h"
 
+PXR_NAMESPACE_OPEN_SCOPE
+
+
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
 
@@ -98,21 +101,46 @@ HdSimpleTextureResource::HdSimpleTextureResource(
         HdMinFilter minFilter, HdMagFilter magFilter)
             : _textureHandle(textureHandle)
             , _texture(textureHandle->GetTexture())
+            , _borderColor(0.0,0.0,0.0,0.0)
+            , _maxAnisotropy(16.0)
             , _sampler(0)
             , _isPtex(isPtex)
 {
-    if (not glGenSamplers) { // GL initialization guard for headless unit test
+    if (!glGenSamplers) { // GL initialization guard for headless unit test
         return;
     }
 
     // When we are not using Ptex we will use samplers,
     // that includes both, bindless textures and no-bindless textures
-    if (not _isPtex) {
+    if (!_isPtex) {
+        // It is possible the texture provides wrap modes itself, in that
+        // case we will use the wrap modes provided by the texture
+        GLenum fwrapS = HdConversions::GetWrap(wrapS);
+        GLenum fwrapT = HdConversions::GetWrap(wrapT);
+        VtDictionary txInfo = _texture->GetTextureInfo();
+        if (VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeS")) {
+            fwrapS = VtDictionaryGet<GLuint>(txInfo, "wrapModeS");
+        }
+        if (VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeT")) {
+            fwrapT = VtDictionaryGet<GLuint>(txInfo, "wrapModeT");
+        }
+
+        GLenum fminFilter = HdConversions::GetMinFilter(minFilter);
+        GLenum fmagFilter = HdConversions::GetMagFilter(magFilter);
+        if (!_texture->IsMinFilterSupported(fminFilter)) {
+            fminFilter = GL_NEAREST;
+        }
+        if (!_texture->IsMagFilterSupported(fmagFilter)) {
+            fmagFilter = GL_NEAREST;
+        }
+
         glGenSamplers(1, &_sampler);
-        glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_S, HdConversions::GetWrap(wrapS));
-        glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_T, HdConversions::GetWrap(wrapT));
-        glSamplerParameteri(_sampler, GL_TEXTURE_MIN_FILTER, HdConversions::GetMinFilter(minFilter));
-        glSamplerParameteri(_sampler, GL_TEXTURE_MAG_FILTER, HdConversions::GetMagFilter(magFilter));
+        glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_S, fwrapS);
+        glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_T, fwrapT);
+        glSamplerParameteri(_sampler, GL_TEXTURE_MIN_FILTER, fminFilter);
+        glSamplerParameteri(_sampler, GL_TEXTURE_MAG_FILTER, fmagFilter);
+        glSamplerParameterf(_sampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, _maxAnisotropy);
+        glSamplerParameterfv(_sampler, GL_TEXTURE_BORDER_COLOR, _borderColor.GetArray());
     }
 
     bool bindlessTexture = 
@@ -120,7 +148,7 @@ HdSimpleTextureResource::HdSimpleTextureResource(
     if (bindlessTexture) {
         size_t handle = GetTexelsTextureHandle();
         if (handle) {
-            if (not glIsTextureHandleResidentNV(handle)) {
+            if (!glIsTextureHandleResidentNV(handle)) {
                 glMakeTextureHandleResidentNV(handle);
             }
         }
@@ -128,7 +156,7 @@ HdSimpleTextureResource::HdSimpleTextureResource(
         if (_isPtex) {
             handle = GetLayoutTextureHandle();
             if (handle) {
-                if (not glIsTextureHandleResidentNV(handle)) {
+                if (!glIsTextureHandleResidentNV(handle)) {
                     glMakeTextureHandleResidentNV(handle);
                 }
             }
@@ -138,8 +166,8 @@ HdSimpleTextureResource::HdSimpleTextureResource(
 
 HdSimpleTextureResource::~HdSimpleTextureResource() 
 { 
-    if (not _isPtex) {
-        if (not glDeleteSamplers) { // GL initialization guard for headless unit test
+    if (!_isPtex) {
+        if (!glDeleteSamplers) { // GL initialization guard for headless unit test
             return;
         }
         glDeleteSamplers(1, &_sampler);
@@ -154,7 +182,13 @@ bool HdSimpleTextureResource::IsPtex() const
 GLuint HdSimpleTextureResource::GetTexelsTextureId() 
 {
     if (_isPtex) {
+#ifdef PXR_PTEX_SUPPORT_ENABLED
         return TfDynamic_cast<GlfPtexTextureRefPtr>(_texture)->GetTexelsTextureName();
+#else
+        TF_CODING_ERROR("Ptex support is disabled.  "
+            "This code path should be unreachable");
+        return 0;
+#endif
     }
 
     return TfDynamic_cast<GlfBaseTextureRefPtr>(_texture)->GetGlTextureName();
@@ -170,8 +204,8 @@ GLuint64EXT HdSimpleTextureResource::GetTexelsTextureHandle()
     GLuint textureId = GetTexelsTextureId();
     GLuint samplerId = GetTexelsSamplerId();
 
-    if (not TF_VERIFY(glGetTextureHandleARB) or
-        not TF_VERIFY(glGetTextureSamplerHandleARB)) {
+    if (!TF_VERIFY(glGetTextureHandleARB) ||
+        !TF_VERIFY(glGetTextureSamplerHandleARB)) {
         return 0;
     }
 
@@ -184,16 +218,22 @@ GLuint64EXT HdSimpleTextureResource::GetTexelsTextureHandle()
 
 GLuint HdSimpleTextureResource::GetLayoutTextureId() 
 {
+#ifdef PXR_PTEX_SUPPORT_ENABLED
     return TfDynamic_cast<GlfPtexTextureRefPtr>(_texture)->GetLayoutTextureName();
+#else
+    TF_CODING_ERROR("Ptex support is disabled.  "
+        "This code path should be unreachable");
+    return 0;
+#endif
 }
 
 GLuint64EXT HdSimpleTextureResource::GetLayoutTextureHandle() 
 {
-    if (not TF_VERIFY(_isPtex)) {
+    if (!TF_VERIFY(_isPtex)) {
         return 0;
     }
     
-    if (not TF_VERIFY(glGetTextureHandleARB)) {
+    if (!TF_VERIFY(glGetTextureHandleARB)) {
         return 0;
     }
 
@@ -201,3 +241,11 @@ GLuint64EXT HdSimpleTextureResource::GetLayoutTextureHandle()
 
     return textureId ? glGetTextureHandleARB(textureId) : 0;
 }
+
+size_t HdSimpleTextureResource::GetMemoryUsed()
+{
+    return _texture->GetMemoryUsed();
+}
+
+PXR_NAMESPACE_CLOSE_SCOPE
+

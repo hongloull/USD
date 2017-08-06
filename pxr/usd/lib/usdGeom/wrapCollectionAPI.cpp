@@ -21,17 +21,23 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
+#include "pxr/pxr.h"
 #include "pxr/usd/usdGeom/collectionAPI.h"
-#include "pxr/usd/usd/conversions.h"
 
+#include "pxr/usd/usd/pyConversions.h"
 #include "pxr/base/tf/pyContainerConversions.h"
 #include "pxr/base/tf/pyResultConversions.h"
 
 #include <boost/python.hpp>
-using namespace boost::python;
 
 #include <string>
+
+using namespace boost::python;
 using std::string;
+
+PXR_NAMESPACE_USING_DIRECTIVE
+
+namespace {
 
 static TfPyObjWrapper 
 _GetTargetFaceCounts(const UsdGeomCollectionAPI &self, const UsdTimeCode &time)
@@ -128,8 +134,9 @@ _AppendTarget(const UsdGeomCollectionAPI &self,
         SdfValueTypeNames->IntArray).Get<VtIntArray>(), time);
 }
 
-void 
-wrapUsdGeomCollectionAPI()
+} // anonymous namespace 
+
+void wrapUsdGeomCollectionAPI()
 {
     typedef UsdGeomCollectionAPI This;
 
