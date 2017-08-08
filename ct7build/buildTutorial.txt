@@ -138,6 +138,16 @@ cmake -D NO_MAYA=1 -D NO_PTEX=1 -D NO_DOC=1 -D NO_OMP=1 -D NO_TBB=1 -D NO_CUDA=1
 make
 
 
+Alembic:
+mkdir build
+cd build
+export ILMBASE_ROOT=/data/share/usd/dependency/ilmbase-2.2.0
+cmake -DCMAKE_INSTALL_PREFIX=/data/share/usd/dependency/alembic-1.7.2 -DALEMBIC_SHARED_LIBS=OFF ..
+make -j2
+make test
+make install
+
+
 USD:
 copy OpenSubdiv include directory to build/usd/include directory and rename it to opensubdiv3
 cp -r /data/share/usd/dependency/OpenSubdiv-3_0_5/include/opensubdiv .
